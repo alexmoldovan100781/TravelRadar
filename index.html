@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1220">
+  <link rel="manifest" href="manifest.json">
+  <title>TravelRadar V1.1</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root{--bg:#f5f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--accent:#2563eb;--border:#e5e7eb}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif}
+    header{padding:calc(env(safe-area-inset-top) + 14px) 18px 14px;background:#0b1220;color:white;display:flex;justify-content:space-between;align-items:center}
+    h1{font-size:22px;margin:0}.badge{font-size:12px;background:#1e40af;padding:6px 9px;border-radius:999px}
+    main{padding:14px;max-width:760px;margin:auto}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:15px;margin-bottom:12px;box-shadow:0 4px 18px #00000008}
+    .row{display:flex;gap:10px;align-items:center}.grow{flex:1}.muted{color:var(--muted);font-size:13px}
+    input,select,button{font:inherit}.input{width:100%;padding:12px;border:1px solid var(--border);border-radius:12px;background:white}
+    button{border:0;border-radius:12px;padding:11px 14px;background:var(--accent);color:white;font-weight:600}
+    button:disabled{opacity:.45;cursor:not-allowed}.secondary{background:#eef2ff;color:#1d4ed8}
+    #map{height:360px;border-radius:15px;overflow:hidden;margin-top:10px}.chips{display:flex;gap:8px;overflow:auto;padding:3px 0 5px}.chip{white-space:nowrap;padding:8px 11px;border-radius:999px;border:1px solid var(--border);background:white;font-size:13px}.chip.active{background:#dbeafe;border-color:#93c5fd;color:#1d4ed8}
+    .place{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}.place:last-child{border-bottom:0}.dot{width:42px;height:42px;border-radius:12px;background:#dbeafe;display:grid;place-items:center;font-size:20px}
+    nav{position:sticky;bottom:0;background:#ffffffed;backdrop-filter:blur(12px);padding:10px max(14px,env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom));display:flex;justify-content:space-around;border-top:1px solid var(--border)}
+    nav button{background:transparent;color:var(--muted);padding:7px 12px}.primary{color:var(--accent)}
+    .hidden{display:none}.status{margin-top:8px;padding:10px;border-radius:10px;background:#f8fafc}.detected{background:#ecfdf5;color:#166534}.error{background:#fef2f2;color:#991b1b}
+  </style>
+</head>
+<body>
+<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V1.1</span></header>
+<main>
+  <section class="card">
+    <div class="row"><input id="url" class="input grow" placeholder="Paste Instagram Reel URL…"><button onclick="prepareReel()">Add</button></div>
+    <div class="muted" style="margin-top:8px">V1.1 never saves a Reel at your current GPS location by default.</div>
+
+    <div id="reelForm" class="hidden" style="margin-top:14px">
+      <input id="locationInput" class="input" placeholder="Enter place or city shown in the Reel…">
+      <div class="row" style="margin-top:10px">
+        <button class="secondary" onclick="detectReelLocation()">Detect location</button>
+        <button id="saveBtn" onclick="saveReel()" disabled>Save</button>
+        <button class="secondary" onclick="clearReel()">Clear</button>
+      </div>
+      <div id="locationStatusReel" class="status muted">Enter the place/city from the Reel, then tap Detect location.</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="row"><div class="grow"><b>Nearby</b><div id="locationStatus" class="muted">Getting your location…</div></div>
+      <select id="radius" class="input" style="width:auto" onchange="render()"><option value="0.5">500 m</option><option value="2">2 km</option><option value="5" selected>5 km</option><option value="10">10 km</option><option value="25">25 km</option></select>
+    </div>
+    <div class="chips" style="margin-top:10px">
+      <button class="chip active" onclick="filterCat('All',this)">All</button><button class="chip" onclick="filterCat('Food',this)">🍝 Food</button><button class="chip" onclick="filterCat('Nature',this)">🌲 Nature</button><button class="chip" onclick="filterCat('Hotel',this)">🏨 Hotel</button><button class="chip" onclick="filterCat('Beach',this)">🏖️ Beach</button>
+    </div>
+  </section>
+
+  <section class="card"><b>Map</b><div id="map"></div></section>
+
+  <section class="card"><div class="row"><div class="grow"><b>Saved places</b><div class="muted" id="count"></div></div><button class="secondary" onclick="seed()">Demo data</button></div><div id="places"></div></section>
+</main>
+<nav><button class="primary" onclick="scrollTo(0,0)">⌖<br><small>Radar</small></button><button onclick="document.getElementById('url').focus()">＋<br><small>Add Reel</small></button><button onclick="alert('Settings will be expanded in V2.')">⚙<br><small>Settings</small></button></nav>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const KEY='travelradar_v1_places';
+let cat='All', user={lat:45.4642,lng:9.19}, map, markers=[];
+let places=JSON.parse(localStorage.getItem(KEY)||'[]');
+let pendingReel=null;
+let detectedLocation=null;
+
+function save(){localStorage.setItem(KEY,JSON.stringify(places));render()}
+
+function prepareReel(){
+  const url=document.getElementById('url').value.trim();
+  if(!url){document.getElementById('url').focus();return}
+  if(!/^https?:\/\/(www\.)?instagram\.com\/(reel|p)\//i.test(url)){
+    alert('Please enter a valid Instagram Reel URL.');
+    return;
+  }
+  pendingReel={url};
+  detectedLocation=null;
+  document.getElementById('reelForm').classList.remove('hidden');
+  document.getElementById('locationInput').focus();
+  document.getElementById('saveBtn').disabled=true;
+  setReelStatus('Enter the place or city from the Reel, then tap Detect location.','');
+}
+
+async function detectReelLocation(){
+  const query=document.getElementById('locationInput').value.trim();
+  if(!query){setReelStatus('Please enter a place or city first.','error');return}
+
+  const btn=document.querySelector('#reelForm button');
+  btn.disabled=true;
+  setReelStatus('Searching OpenStreetMap…','');
+
+  try{
+    const response=await fetch(
+      'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&q='+encodeURIComponent(query),
+      {headers:{'Accept':'application/json'}}
+    );
+    if(!response.ok) throw new Error('Geocoding request failed');
+    const results=await response.json();
+
+    if(!results.length){
+      detectedLocation=null;
+      document.getElementById('saveBtn').disabled=true;
+      setReelStatus('Location not found. Try a more specific place, city or country.','error');
+      return;
+    }
+
+    const r=results[0];
+    detectedLocation={
+      lat:Number(r.lat),
+      lng:Number(r.lon),
+      location:r.display_name
+    };
+
+    document.getElementById('saveBtn').disabled=false;
+    setReelStatus('Detected: '+r.display_name,'detected');
+
+    if(map){
+      map.setView([detectedLocation.lat,detectedLocation.lng],13);
+      if(window.pendingMarker) map.removeLayer(window.pendingMarker);
+      window.pendingMarker=L.marker([detectedLocation.lat,detectedLocation.lng])
+        .addTo(map)
+        .bindPopup('<b>Reel location</b><br>'+escapeHtml(r.display_name))
+        .openPopup();
+    }
+  }catch(e){
+    detectedLocation=null;
+    document.getElementById('saveBtn').disabled=true;
+    setReelStatus('Could not detect the location. Please try again.','error');
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+function saveReel(){
+  if(!pendingReel || !detectedLocation){
+    alert('Detect the Reel location before saving.');
+    return;
+  }
+
+  places.unshift({
+    id:Date.now(),
+    title:'Saved from Reel',
+    category:'Travel',
+    url:pendingReel.url,
+    lat:detectedLocation.lat,
+    lng:detectedLocation.lng,
+    location:detectedLocation.location
+  });
+
+  document.getElementById('url').value='';
+  clearReel();
+  save();
+  alert('Saved to TravelRadar at the detected Reel location.');
+}
+
+function clearReel(){
+  pendingReel=null;
+  detectedLocation=null;
+  document.getElementById('reelForm').classList.add('hidden');
+  document.getElementById('locationInput').value='';
+  document.getElementById('saveBtn').disabled=true;
+  if(window.pendingMarker && map){
+    map.removeLayer(window.pendingMarker);
+    window.pendingMarker=null;
+  }
+}
+
+function setReelStatus(text,type){
+  const el=document.getElementById('locationStatusReel');
+  el.textContent=text;
+  el.className='status muted '+(type||'');
+}
+
+function escapeHtml(text){
+  return String(text).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+}
+
+function seed(){
+  places=[
+   {id:1,title:'Lake Garda viewpoint',category:'Nature',location:'Lake Garda',lat:45.479,lng:10.61,url:'#'},
+   {id:2,title:'Sirmione lakeside spot',category:'Beach',location:'Sirmione',lat:45.492,lng:10.61,url:'#'},
+   {id:3,title:'Local Italian restaurant',category:'Food',location:'Sirmione',lat:45.496,lng:10.606,url:'#'},
+   {id:4,title:'Boutique hotel',category:'Hotel',location:'Sirmione',lat:45.491,lng:10.604,url:'#'}
+  ];
+  save();
+}
+
+function filterCat(c,el){
+  cat=c;
+  document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+function distance(a,b,c,d){
+  const R=6371,x=(c-a)*Math.PI/180,y=(d-b)*Math.PI/180;
+  const q=Math.sin(x/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(y/2)**2;
+  return R*2*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));
+}
+
+function render(){
+  const r=+document.getElementById('radius').value;
+  let shown=places.filter(p=>(cat==='All'||p.category===cat)&&distance(user.lat,user.lng,p.lat,p.lng)<=r);
+  document.getElementById('count').textContent=shown.length+' place'+(shown.length===1?'':'s')+' within '+r+' km';
+  document.getElementById('places').innerHTML=shown.length
+    ?shown.map(p=>`<div class="place"><div class="dot">📍</div><div class="grow"><b>${escapeHtml(p.title)}</b><div class="muted">${escapeHtml(p.location)} · ${distance(user.lat,user.lng,p.lat,p.lng).toFixed(1)} km</div><div style="margin-top:5px"><a href="${p.url}" target="_blank">Open Reel ↗</a></div></div></div>`).join('')
+    :'<div class="muted" style="padding:15px 0">No saved places in this radius.</div>';
+
+  if(map){
+    markers.forEach(m=>map.removeLayer(m));
+    markers=[];
+    shown.forEach(p=>{
+      markers.push(
+        L.marker([p.lat,p.lng]).addTo(map).bindPopup(
+          `<b>${escapeHtml(p.title)}</b><br>${escapeHtml(p.location)}`
+        )
+      );
+    });
+  }
+}
+
+function initMap(){
+  map=L.map('map').setView([user.lat,user.lng],11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
+  L.marker([user.lat,user.lng]).addTo(map).bindPopup('You are here');
+  render();
+}
+
+navigator.geolocation?.getCurrentPosition(pos=>{
+  user={lat:pos.coords.latitude,lng:pos.coords.longitude};
+  document.getElementById('locationStatus').textContent='Location detected';
+  if(map){
+    map.setView([user.lat,user.lng],12);
+    render();
+  }
+},()=>{
+  document.getElementById('locationStatus').textContent='Using demo location (Milan)';
+});
+
+initMap();
+</script>
+</body>
+</html>
