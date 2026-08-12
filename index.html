@@ -24,7 +24,7 @@ nav button{background:transparent;color:var(--muted);padding:7px 12px}.primary{c
 </style>
 </head>
 <body>
-<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Your travel radar with friends</div></div><span class="badge">V2.0</span></header>
+<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Your travel radar with friends</div></div><span class="badge">V2.1</span></header>
 <main>
 
 <section class="card" id="authCard">
@@ -33,7 +33,7 @@ nav button{background:transparent;color:var(--muted);padding:7px 12px}.primary{c
     <div class="muted" style="margin-top:5px">Enter your email and we'll send a 6-digit OTP.</div>
     <div class="row" style="margin-top:10px"><input id="loginEmail" class="input grow" type="email" autocomplete="email" placeholder="you@example.com"><button onclick="sendOtp()">Send OTP</button></div>
     <div id="otpBox" class="hidden" style="margin-top:10px"><div class="row"><input id="loginOtp" class="input grow" inputmode="numeric" maxlength="6" placeholder="6-digit code"><button onclick="verifyOtp()">Verify</button></div></div>
-    <div id="authStatus" class="status muted">Not signed in.</div>
+    <div id="authStatus" class="status muted">Not signed in.</div><div id="connectionStatus" class="status muted">Checking Supabase connection…</div>
   </div>
   <div id="userView" class="hidden"><div class="row"><div class="grow"><b id="userEmail"></b><div class="muted">Your places are private until you share them.</div></div><button class="secondary" onclick="signOut()">Sign out</button></div></div>
 </section>
@@ -78,11 +78,12 @@ nav button{background:transparent;color:var(--muted);padding:7px 12px}.primary{c
 <nav><button class="primary" onclick="scrollTo(0,0)">⌖<br><small>Radar</small></button><button onclick="document.getElementById('url')?.focus()">＋<br><small>Add Reel</small></button><button onclick="document.getElementById('friendsCard')?.scrollIntoView()">👥<br><small>Friends</small></button></nav>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2?trv=2.1"></script>
 <script>
 const SUPABASE_URL='https://nltldsuuschjjcwcyfk.supabase.co';
 const SUPABASE_KEY='sb_publishable_SSus7zVVSHTly4joGizTWQ_WvRR-JLP';
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+setTimeout(checkSupabaseConnection,250);
 let sessionUser=null, places=[], friends=[], requests=[], map, markers=[], circles=[], user={lat:45.4642,lng:9.19};
 let pendingReel=null,detectedLocation=null,viewMode='all',notifyPermission=false,geoWatchId=null;
 
@@ -96,9 +97,59 @@ function showApp(on){['friendsCard','addCard','nearbyCard','notifyCard','mapCard
 async function sendOtp(){
  const email=document.getElementById('loginEmail').value.trim().toLowerCase();
  if(!email)return msg('authStatus','Enter your email.','error');
- const {error}=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:true}});
- if(error)return msg('authStatus',error.message,'error');
- document.getElementById('otpBox').classList.remove('hidden');msg('authStatus','OTP sent. Check your email for the 6-digit code.');
+ const btn=document.querySelector('#loginView button');
+ if(btn)btn.disabled=true;
+ msg('authStatus','Connecting to Supabase Auth…');
+ try{
+   const result=await sb.auth.signInWithOtp({email,options:{shouldCreateUser:true}});
+   if(result.error){
+     const e=result.error;
+     const details=[e.message,e.code?('code: '+e.code):'',e.status?('HTTP '+e.status):'',e.name?('type: '+e.name):''].filter(Boolean).join(' · ');
+     msg('authStatus','Supabase Auth error: '+details,'error');
+     console.error('TravelRadar Auth error',e);
+     return;
+   }
+   document.getElementById('otpBox').classList.remove('hidden');
+   msg('authStatus','OTP sent. Check your email for the 6-digit code.');
+ }catch(e){
+   const details=e?.message||String(e);
+   msg('authStatus','Network/Auth request failed: '+details+' — check the Supabase connection status below.','error');
+   console.error('TravelRadar Auth exception',e);
+ }finally{
+   if(btn)btn.disabled=false;
+ }
+}
+
+async function checkSupabaseConnection(){
+ const el=document.getElementById('connectionStatus');
+ try{
+   const controller=new AbortController();
+   const timer=setTimeout(()=>controller.abort(),10000);
+   const r=await fetch(SUPABASE_URL+'/auth/v1/settings',{
+     method:'GET',
+     headers:{'apikey':SUPABASE_KEY,'Accept':'application/json'},
+     cache:'no-store',
+     signal:controller.signal
+   });
+   clearTimeout(timer);
+   const text=await r.text();
+   if(r.ok){
+     try{
+       const settings=JSON.parse(text);
+       el.textContent='✓ Supabase Auth reachable'+(settings?.external?.email===true?' · Email provider enabled':'');
+     }catch(_){
+       el.textContent='✓ Supabase Auth reachable';
+     }
+     el.className='status muted detected';
+   }else{
+     el.textContent='Supabase Auth returned HTTP '+r.status+(text?' · '+text.slice(0,180):'');
+     el.className='status muted error';
+   }
+ }catch(e){
+   el.textContent='✕ Supabase Auth is not reachable from this device/browser: '+(e?.message||String(e));
+   el.className='status muted error';
+   console.error('TravelRadar Supabase connectivity error',e);
+ }
 }
 async function verifyOtp(){
  const email=document.getElementById('loginEmail').value.trim().toLowerCase(),token=document.getElementById('loginOtp').value.trim();
