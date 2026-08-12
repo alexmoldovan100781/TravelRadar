@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar V1.3</title>
+  <title>TravelRadar V1.4</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f5f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--accent:#2563eb;--border:#e5e7eb}
@@ -25,7 +25,7 @@
   </style>
 </head>
 <body>
-<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V1.3</span></header>
+<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V1.4</span></header>
 <main>
   <section class="card">
     <div class="row"><input id="url" class="input grow" placeholder="Paste Instagram Reel URL…"><button onclick="prepareReel()">Add</button></div>
@@ -33,6 +33,18 @@
 
     <div id="reelForm" class="hidden" style="margin-top:14px">
       <input id="locationInput" class="input" placeholder="Enter place or city shown in the Reel…">
+      <div style="margin-top:10px">
+        <label class="muted" for="reelNotifyRadius"><b>Alert radius</b></label>
+        <select id="reelNotifyRadius" class="input" style="margin-top:5px">
+          <option value="0.5">500 m</option>
+          <option value="1">1 km</option>
+          <option value="2" selected>2 km</option>
+          <option value="5">5 km</option>
+          <option value="10">10 km</option>
+          <option value="custom">Custom</option>
+        </select>
+        <input id="reelCustomRadius" class="input hidden" type="number" min="0.1" max="100" step="0.1" placeholder="Custom radius in km" style="margin-top:7px">
+      </div>
       <div class="row" style="margin-top:10px">
         <button class="secondary" onclick="detectReelLocation()">Detect location</button>
         <button id="saveBtn" onclick="saveReel()" disabled>Save</button>
@@ -84,6 +96,7 @@ let detectedLocation=null;
 let notificationPermission=false;
 let geoWatchId=null;
 let lastUserPosition=null;
+let alertCircles=[];
 let notificationCooldownMs=60000;
 
 function save(){localStorage.setItem(KEY,JSON.stringify(places));render()}
@@ -97,6 +110,9 @@ function prepareReel(){
   }
   pendingReel={url};
   detectedLocation=null;
+  document.getElementById('reelNotifyRadius').value='2';
+  document.getElementById('reelCustomRadius').value='';
+  document.getElementById('reelCustomRadius').classList.add('hidden');
   document.getElementById('reelForm').classList.remove('hidden');
   document.getElementById('locationInput').focus();
   document.getElementById('saveBtn').disabled=true;
@@ -153,11 +169,37 @@ async function detectReelLocation(){
   }
 }
 
+function getSelectedReelRadius(){
+  const value=document.getElementById('reelNotifyRadius').value;
+  if(value==='custom'){
+    const custom=Number(document.getElementById('reelCustomRadius').value);
+    if(!Number.isFinite(custom) || custom<0.1 || custom>100){
+      alert('Enter a custom alert radius between 0.1 and 100 km.');
+      return null;
+    }
+    return custom;
+  }
+  return Number(value);
+}
+
+function formatRadius(km){
+  return km<1 ? `${Math.round(km*1000)} m` : `${km} km`;
+}
+
+document.getElementById('reelNotifyRadius').addEventListener('change', e=>{
+  const custom=document.getElementById('reelCustomRadius');
+  custom.classList.toggle('hidden', e.target.value!=='custom');
+  if(e.target.value==='custom') custom.focus();
+});
+
 function saveReel(){
   if(!pendingReel || !detectedLocation){
     alert('Detect the Reel location before saving.');
     return;
   }
+
+  const notifyRadius=getSelectedReelRadius();
+  if(notifyRadius===null)return;
 
   places.unshift({
     id:Date.now(),
@@ -166,7 +208,10 @@ function saveReel(){
     url:pendingReel.url,
     lat:detectedLocation.lat,
     lng:detectedLocation.lng,
-    location:detectedLocation.location
+    location:detectedLocation.location,
+    notifyEnabled:false,
+    notifyRadius:notifyRadius,
+    insideGeofence:false
   });
 
   document.getElementById('url').value='';
@@ -248,13 +293,12 @@ function toggleNotification(id){
     return;
   }
 
-  const radius=+document.getElementById('radius').value;
   p.notifyEnabled=!p.notifyEnabled;
+  const radius=Number(p.notifyRadius||2);
 
   if(p.notifyEnabled){
-    p.notifyRadius=radius;
     p.insideGeofence=false;
-    updateNotifyStatus(`Alert armed for ${p.location} within ${radius} km.`);
+    updateNotifyStatus(`Alert armed for ${p.location} within ${formatRadius(radius)}.`);
   }else{
     p.insideGeofence=false;
   }
@@ -363,6 +407,7 @@ function render(){
     <div class="grow">
       <b>${escapeHtml(p.title)}</b>
       <div class="muted">${escapeHtml(p.location)} · ${distance(user.lat,user.lng,p.lat,p.lng).toFixed(1)} km</div>
+      <div class="muted">🔔 Alert radius: ${formatRadius(Number(p.notifyRadius||2))}</div>
       <div style="margin-top:5px">
         <a href="${escapeHtml(p.url)}" target="_blank">Open Reel ↗</a>
         ${p.url && p.url !== '#' ? `<button class="notifyBtn ${p.notifyEnabled?'on':''}" onclick="toggleNotification(${p.id})">${p.notifyEnabled?'🔔 On':'🔔 Notify'}</button>` : ''}
@@ -375,8 +420,11 @@ function render(){
   if(map){
     markers.forEach(m=>map.removeLayer(m));
     markers=[];
+    alertCircles.forEach(c=>map.removeLayer(c));
+    alertCircles=[];
     shown.forEach(p=>{
       const reelUrl=safeUrl(p.url);
+      const alertRadius=Number(p.notifyRadius||2);
       const reelLink=reelUrl!=='#'
         ? `<br><br><a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" style="font-weight:600">🔗 Open Reel ↗</a>`
         : '';
@@ -385,6 +433,16 @@ function render(){
         `<b>${escapeHtml(p.title)}</b><br>${escapeHtml(p.location)}${reelLink}${deleteLink}`
       );
       markers.push(marker);
+      const circle=L.circle([p.lat,p.lng],{
+        radius:alertRadius*1000,
+        color:'#2563eb',
+        fillColor:'#2563eb',
+        fillOpacity:0.08,
+        weight:1
+      }).addTo(map).bindPopup(
+        `<b>Alert radius</b><br>${escapeHtml(formatRadius(alertRadius))}`
+      );
+      alertCircles.push(circle);
     });
   }
 }
