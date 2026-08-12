@@ -29,7 +29,7 @@
 <main>
   <section class="card">
     <div class="row"><input id="url" class="input grow" placeholder="Paste Instagram Reel URL…"><button onclick="prepareReel()">Add</button></div>
-    <div class="muted" style="margin-top:8px">V1.3 never saves a Reel at your current GPS location by default.</div>
+    <div class="muted" style="margin-top:8px">V1.2 never saves a Reel at your current GPS location by default.</div>
 
     <div id="reelForm" class="hidden" style="margin-top:14px">
       <input id="locationInput" class="input" placeholder="Enter place or city shown in the Reel…">
@@ -196,7 +196,7 @@ function escapeHtml(text){
 
 async function enableNotifications(){
   if(!('Notification' in window)){
-    updateNotifyStatus('Notifications are not supported by this browser.','error');
+    updateNotifyStatus('On iPhone, add TravelRadar to the Home Screen and open it there to enable notifications.','error');
     return;
   }
 
@@ -207,11 +207,13 @@ async function enableNotifications(){
     if(notificationPermission){
       updateNotifyStatus('Notifications enabled. Select 🔔 Notify on a saved place.');
       startGeofenceMonitoring();
+    }else if(permission==='denied'){
+      updateNotifyStatus('Notifications are blocked. Enable them in iPhone Settings → Notifications → TravelRadar.','error');
     }else{
       updateNotifyStatus('Notification permission was not granted.','error');
     }
   }catch(e){
-    updateNotifyStatus('Could not enable notifications.','error');
+    updateNotifyStatus('Could not enable notifications in this browser context.','error');
   }
 }
 
