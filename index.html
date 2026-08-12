@@ -339,6 +339,20 @@ function distance(a,b,c,d){
   return R*2*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));
 }
 
+function deletePlace(id){
+  const p=places.find(x=>x.id===id);
+  if(!p)return;
+  if(!confirm(`Delete "${p.location}" from TravelRadar?`))return;
+
+  places=places.filter(x=>x.id!==id);
+  save();
+
+  if(window.pendingMarker && window.pendingMarker._travelRadarPlaceId===id && map){
+    map.removeLayer(window.pendingMarker);
+    window.pendingMarker=null;
+  }
+}
+
 function render(){
   const r=+document.getElementById('radius').value;
   let shown=places.filter(p=>(cat==='All'||p.category===cat)&&distance(user.lat,user.lng,p.lat,p.lng)<=r);
@@ -352,6 +366,7 @@ function render(){
       <div style="margin-top:5px">
         <a href="${escapeHtml(p.url)}" target="_blank">Open Reel ↗</a>
         ${p.url && p.url !== '#' ? `<button class="notifyBtn ${p.notifyEnabled?'on':''}" onclick="toggleNotification(${p.id})">${p.notifyEnabled?'🔔 On':'🔔 Notify'}</button>` : ''}
+        <button class="notifyBtn" onclick="deletePlace(${p.id})" style="background:#fee2e2;color:#991b1b">🗑 Delete</button>
       </div>
     </div>
   </div>`).join('')
@@ -365,11 +380,11 @@ function render(){
       const reelLink=reelUrl!=='#'
         ? `<br><br><a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" style="font-weight:600">🔗 Open Reel ↗</a>`
         : '';
-      markers.push(
-        L.marker([p.lat,p.lng]).addTo(map).bindPopup(
-          `<b>${escapeHtml(p.title)}</b><br>${escapeHtml(p.location)}${reelLink}`
-        )
+      const deleteLink=`<br><button onclick="deletePlace(${p.id})" style="margin-top:10px;background:#fee2e2;color:#991b1b;padding:7px 10px;border-radius:8px;border:0;font-weight:600">🗑 Delete pin</button>`;
+      const marker=L.marker([p.lat,p.lng]).addTo(map).bindPopup(
+        `<b>${escapeHtml(p.title)}</b><br>${escapeHtml(p.location)}${reelLink}${deleteLink}`
       );
+      markers.push(marker);
     });
   }
 }
