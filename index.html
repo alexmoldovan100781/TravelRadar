@@ -191,6 +191,15 @@ function escapeHtml(text){
   return String(text).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 }
 
+function safeUrl(url){
+  try{
+    const u=new URL(url,window.location.href);
+    return /^https?:$/.test(u.protocol) ? u.href : '#';
+  }catch(e){
+    return '#';
+  }
+}
+
 
 async function enableNotifications(){
   if(!('Notification' in window)){
@@ -352,9 +361,13 @@ function render(){
     markers.forEach(m=>map.removeLayer(m));
     markers=[];
     shown.forEach(p=>{
+      const reelUrl=safeUrl(p.url);
+      const reelLink=reelUrl!=='#'
+        ? `<br><br><a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" style="font-weight:600">🔗 Open Reel ↗</a>`
+        : '';
       markers.push(
         L.marker([p.lat,p.lng]).addTo(map).bindPopup(
-          `<b>${escapeHtml(p.title)}</b><br>${escapeHtml(p.location)}`
+          `<b>${escapeHtml(p.title)}</b><br>${escapeHtml(p.location)}${reelLink}`
         )
       );
     });
