@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar V1.1</title>
+  <title>TravelRadar V1.2</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f5f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--accent:#2563eb;--border:#e5e7eb}
@@ -25,11 +25,11 @@
   </style>
 </head>
 <body>
-<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V1.1</span></header>
+<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V1.2</span></header>
 <main>
   <section class="card">
     <div class="row"><input id="url" class="input grow" placeholder="Paste Instagram Reel URL…"><button onclick="prepareReel()">Add</button></div>
-    <div class="muted" style="margin-top:8px">V1.1 never saves a Reel at your current GPS location by default.</div>
+    <div class="muted" style="margin-top:8px">V1.2 never saves a Reel at your current GPS location by default.</div>
 
     <div id="reelForm" class="hidden" style="margin-top:14px">
       <input id="locationInput" class="input" placeholder="Enter place or city shown in the Reel…">
@@ -44,7 +44,7 @@
 
   <section class="card">
     <div class="row"><div class="grow"><b>Nearby</b><div id="locationStatus" class="muted">Getting your location…</div></div>
-      <select id="radius" class="input" style="width:auto" onchange="render()"><option value="0.5">500 m</option><option value="2">2 km</option><option value="5" selected>5 km</option><option value="10">10 km</option><option value="25">25 km</option></select>
+      <select id="radius" class="input" style="width:auto" onchange="render()"><option value="0.5">500 m</option><option value="2">2 km</option><option value="5" selected>5 km</option><option value="10">10 km</option><option value="25">25 km</option><option value="50">50 km</option></select>
     </div>
     <div class="chips" style="margin-top:10px">
       <button class="chip active" onclick="filterCat('All',this)">All</button><button class="chip" onclick="filterCat('Food',this)">🍝 Food</button><button class="chip" onclick="filterCat('Nature',this)">🌲 Nature</button><button class="chip" onclick="filterCat('Hotel',this)">🏨 Hotel</button><button class="chip" onclick="filterCat('Beach',this)">🏖️ Beach</button>
