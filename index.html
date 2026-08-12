@@ -72,7 +72,13 @@
 <script>
 const KEY='travelradar_v1_places';
 let cat='All', user={lat:45.4642,lng:9.19}, map, markers=[];
+const RESET_EXISTING_PINS_KEY='travelradar_v1_3_pins_reset';
 let places=JSON.parse(localStorage.getItem(KEY)||'[]');
+if(!localStorage.getItem(RESET_EXISTING_PINS_KEY)){
+  places=[];
+  localStorage.setItem(KEY,JSON.stringify(places));
+  localStorage.setItem(RESET_EXISTING_PINS_KEY,'1');
+}
 let pendingReel=null;
 let detectedLocation=null;
 let notificationPermission=false;
@@ -343,14 +349,8 @@ function deletePlace(id){
   const p=places.find(x=>x.id===id);
   if(!p)return;
   if(!confirm(`Delete "${p.location}" from TravelRadar?`))return;
-
   places=places.filter(x=>x.id!==id);
   save();
-
-  if(window.pendingMarker && window.pendingMarker._travelRadarPlaceId===id && map){
-    map.removeLayer(window.pendingMarker);
-    window.pendingMarker=null;
-  }
 }
 
 function render(){
