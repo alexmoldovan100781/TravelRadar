@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar V1.9 Caption Choice</title>
+  <title>TravelRadar V1.9 Caption Choice + All</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f5f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--accent:#2563eb;--border:#e5e7eb}
@@ -32,7 +32,7 @@
   </style>
 </head>
 <body>
-<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V1.9 Caption Choice</span></header>
+<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V1.9 Caption Choice + All</span></header>
 <main>
   <section class="card">
     <div class="row"><input id="url" class="input grow" placeholder="Paste Instagram Reel URL…"><button onclick="prepareReel()">Add</button></div>
@@ -93,13 +93,7 @@
 const KEY='travelradar_v1_places';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user={lat:45.4642,lng:9.19}, map, markers=[];
-const RESET_EXISTING_PINS_KEY='travelradar_v1_3_pins_reset';
 let places=JSON.parse(localStorage.getItem(KEY)||'[]');
-if(!localStorage.getItem(RESET_EXISTING_PINS_KEY)){
-  places=[];
-  localStorage.setItem(KEY,JSON.stringify(places));
-  localStorage.setItem(RESET_EXISTING_PINS_KEY,'1');
-}
 let pendingReel=null;
 let detectedLocation=null;
 let detectedCandidates=[];
@@ -480,6 +474,13 @@ function render(){
       );
       alertCircles.push(circle);
     });
+
+    if(allPlaces && shown.length){
+      const bounds=L.latLngBounds(
+        shown.map(p=>[p.lat,p.lng])
+      );
+      map.fitBounds(bounds,{padding:[30,30],maxZoom:13});
+    }
   }
 }
 
