@@ -58,7 +58,7 @@
 
   <section class="card">
     <div class="row"><div class="grow"><b>Nearby</b><div id="locationStatus" class="muted">Getting your location…</div></div>
-      <select id="radius" class="input" style="width:auto" onchange="render()"><option value="0.5">500 m</option><option value="2">2 km</option><option value="5" selected>5 km</option><option value="10">10 km</option><option value="25">25 km</option><option value="50">50 km</option></select>
+      <select id="radius" class="input" style="width:auto" onchange="render()"><option value="0.5">500 m</option><option value="2">2 km</option><option value="5" selected>5 km</option><option value="10">10 km</option><option value="25">25 km</option><option value="50">50 km</option><option value="all">All</option></select>
     </div>
     <div class="chips" style="margin-top:10px">
       <button class="chip active" onclick="filterCat('All',this)">All</button><button class="chip" onclick="filterCat('Food',this)">🍝 Food</button><button class="chip" onclick="filterCat('Nature',this)">🌲 Nature</button><button class="chip" onclick="filterCat('Hotel',this)">🏨 Hotel</button><button class="chip" onclick="filterCat('Beach',this)">🏖️ Beach</button>
@@ -407,9 +407,16 @@ function deletePlace(id){
 }
 
 function render(){
-  const r=+document.getElementById('radius').value;
-  let shown=places.filter(p=>(cat==='All'||p.category===cat)&&distance(user.lat,user.lng,p.lat,p.lng)<=r);
-  document.getElementById('count').textContent=shown.length+' place'+(shown.length===1?'':'s')+' within '+r+' km';
+  const radiusValue=document.getElementById('radius').value;
+  const allPlaces=radiusValue==='all';
+  const r=allPlaces?Infinity:Number(radiusValue);
+  let shown=places.filter(p=>
+    (cat==='All'||p.category===cat) &&
+    (allPlaces || distance(user.lat,user.lng,p.lat,p.lng)<=r)
+  );
+  document.getElementById('count').textContent=
+    shown.length+' place'+(shown.length===1?'':'s')+
+    (allPlaces ? ' · all saved places' : ' within '+r+' km');
   document.getElementById('places').innerHTML=shown.length
     ?shown.map(p=>`<div class="place">
     <div class="dot">📍</div>
