@@ -118,6 +118,11 @@ function isSupportedReelUrl(url){
     // Facebook Reels
     if(host==='facebook.com' && /^\/reel(s)?\//.test(path)) return true;
 
+    // Facebook share links. Facebook can return a generic /share/<token>
+    // from "Copy link", not only the newer /share/r/<token> format.
+    // The target may resolve to a Reel, so let the AI proxy inspect it.
+    if(host==='facebook.com' && /^\/share\/(?:r\/)?[^/]+/.test(path)) return true;
+
     // Facebook short links can redirect to a Reel.
     if(host==='fb.watch' && path.length>1) return true;
 
