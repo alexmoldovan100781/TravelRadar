@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar V1.9 Caption Choice + All</title>
+  <title>TravelRadar V2.0 Facebook Reels</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f5f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--accent:#2563eb;--border:#e5e7eb}
@@ -32,10 +32,10 @@
   </style>
 </head>
 <body>
-<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V1.9 Caption Choice + All</span></header>
+<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V2.0 Facebook Reels</span></header>
 <main>
   <section class="card">
-    <div class="row"><input id="url" class="input grow" placeholder="Paste Instagram Reel URL…"><button onclick="prepareReel()">Add</button></div>
+    <div class="row"><input id="url" class="input grow" placeholder="Paste Instagram or Facebook Reel URL…"><button onclick="prepareReel()">Add</button></div>
     
 
     <div id="reelForm" class="hidden" style="margin-top:14px">
@@ -106,11 +106,42 @@ let notificationCooldownMs=60000;
 
 function save(){localStorage.setItem(KEY,JSON.stringify(places));render()}
 
+function isSupportedReelUrl(url){
+  try{
+    const u=new URL(url);
+    const host=u.hostname.toLowerCase().replace(/^www\./,'');
+    const path=u.pathname.toLowerCase();
+
+    // Instagram Reels/posts
+    if(host==='instagram.com' && /^\/(reel|p)\//.test(path)) return true;
+
+    // Facebook Reels
+    if(host==='facebook.com' && /^\/reel(s)?\//.test(path)) return true;
+
+    // Facebook short links can redirect to a Reel.
+    if(host==='fb.watch' && path.length>1) return true;
+
+    return false;
+  }catch(e){
+    return false;
+  }
+}
+
+function getReelPlatform(url){
+  try{
+    const host=new URL(url).hostname.toLowerCase().replace(/^www\./,'');
+    if(host==='facebook.com' || host==='fb.watch') return 'Facebook';
+    return 'Instagram';
+  }catch(e){
+    return 'Reel';
+  }
+}
+
 function prepareReel(){
   const url=document.getElementById('url').value.trim();
   if(!url){document.getElementById('url').focus();return}
-  if(!/^https?:\/\/(www\.)?instagram\.com\/(reel|p)\//i.test(url)){
-    alert('Please enter a valid Instagram Reel URL.');
+  if(!isSupportedReelUrl(url)){
+    alert('Please enter a valid Instagram or Facebook Reel URL.');
     return;
   }
   pendingReel={url};
@@ -210,9 +241,10 @@ function saveReel(){
 
   places.unshift({
     id:Date.now(),
-    title:'Saved from Reel',
+    title:'Saved from '+getReelPlatform(pendingReel.url)+' Reel',
     category:'Travel',
     url:pendingReel.url,
+    platform:getReelPlatform(pendingReel.url),
     lat:detectedLocation.lat,
     lng:detectedLocation.lng,
     location:detectedLocation.location,
@@ -439,7 +471,7 @@ function render(){
       <div class="muted">${escapeHtml(p.location)} · ${distance(user.lat,user.lng,p.lat,p.lng).toFixed(1)} km</div>
       <div class="muted">🔔 Alert radius: ${formatRadius(Number(p.notifyRadius||2))}</div>
       <div style="margin-top:5px">
-        <a href="${escapeHtml(p.url)}" target="_blank">Open Reel ↗</a>
+        <a href="${escapeHtml(p.url)}" target="_blank">Open ${escapeHtml(p.platform||'Reel')} ↗</a>
         ${p.url && p.url !== '#' ? `<button class="notifyBtn ${p.notifyEnabled?'on':''}" onclick="toggleNotification(${p.id})">${p.notifyEnabled?'🔔 On':'🔔 Notify'}</button>` : ''}
         <button class="notifyBtn" onclick="deletePlace(${p.id})" style="background:#fee2e2;color:#991b1b">🗑 Delete</button>
       </div>
@@ -456,7 +488,7 @@ function render(){
       const reelUrl=safeUrl(p.url);
       const alertRadius=Number(p.notifyRadius||2);
       const reelLink=reelUrl!=='#'
-        ? `<br><br><a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" style="font-weight:600">🔗 Open Reel ↗</a>`
+        ? `<br><br><a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" style="font-weight:600">🔗 Open ${escapeHtml(p.platform||'Reel')} ↗</a>`
         : '';
       const deleteLink=`<br><button onclick="deletePlace(${p.id})" style="margin-top:10px;background:#fee2e2;color:#991b1b;padding:7px 10px;border-radius:8px;border:0;font-weight:600">🗑 Delete pin</button>`;
       const marker=L.marker([p.lat,p.lng]).addTo(map).bindPopup(
@@ -513,7 +545,7 @@ initMap();
 async function analyzeReelWithAI(){
   const url=document.getElementById('url').value.trim();
   if(!url){
-    alert('Paste an Instagram Reel URL first.');
+    alert('Paste an Instagram or Facebook Reel URL first.');
     return;
   }
 
@@ -635,7 +667,7 @@ async function analyzeReelWithAI(){
   }catch(e){
 
     console.warn(
-      'Caption location detection failed:',
+      'Reel location detection failed:',
       e
     );
 
