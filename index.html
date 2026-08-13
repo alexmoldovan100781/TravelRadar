@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar V1.4</title>
+  <title>TravelRadar V1.6 AI</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f5f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--accent:#2563eb;--border:#e5e7eb}
@@ -25,11 +25,11 @@
   </style>
 </head>
 <body>
-<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V1.4</span></header>
+<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V1.6 AI</span></header>
 <main>
   <section class="card">
     <div class="row"><input id="url" class="input grow" placeholder="Paste Instagram Reel URL…"><button onclick="prepareReel()">Add</button></div>
-    <div class="muted" style="margin-top:8px">V1.2 never saves a Reel at your current GPS location by default.</div>
+    <div class="muted" style="margin-top:8px">AI can try to infer the Reel location automatically; manual location remains available if analysis fails. Never saves a Reel at your current GPS location by default.</div>
 
     <div id="reelForm" class="hidden" style="margin-top:14px">
       <input id="locationInput" class="input" placeholder="Enter place or city shown in the Reel…">
@@ -46,11 +46,13 @@
         <input id="reelCustomRadius" class="input hidden" type="number" min="0.1" max="100" step="0.1" placeholder="Custom radius in km" style="margin-top:7px">
       </div>
       <div class="row" style="margin-top:10px">
-        <button class="secondary" onclick="detectReelLocation()">Detect location</button>
+        <button onclick="analyzeReelWithAI()">🤖 AI Detect</button>
+        <button class="secondary" onclick="detectReelLocation()">Manual location</button>
         <button id="saveBtn" onclick="saveReel()" disabled>Save</button>
         <button class="secondary" onclick="clearReel()">Clear</button>
       </div>
-      <div id="locationStatusReel" class="status muted">Enter the place/city from the Reel, then tap Detect location.</div>
+      <div id="locationStatusReel" class="status muted">Paste the Reel URL and tap 🤖 AI Detect. If the Reel cannot be read, you can enter the location manually.</div>
+      <div id="aiResult" class="hidden" style="margin-top:10px"></div>
     </div>
   </section>
 
@@ -83,6 +85,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
+window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user={lat:45.4642,lng:9.19}, map, markers=[];
 const RESET_EXISTING_PINS_KEY='travelradar_v1_3_pins_reset';
 let places=JSON.parse(localStorage.getItem(KEY)||'[]');
@@ -469,6 +472,95 @@ navigator.geolocation?.getCurrentPosition(pos=>{
 notificationPermission=('Notification' in window && Notification.permission==='granted');
 if(notificationPermission) updateNotifyStatus('Notifications enabled. Select 🔔 Notify on a saved place.');
 initMap();
+</script>
+
+<script type="module">
+import { AutoModel, AutoProcessor, RawImage, Tensor } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers/+esm";
+
+const AI_PROXY_URL = window.TRAVELRADAR_AI_PROXY || '';
+const GEOCLIP_MODEL = 'Xenova/geoclip-large-patch14';
+let geoVisionModel=null, geoLocationModel=null, geoProcessor=null, geoGpsData=null;
+let geoLoadingPromise=null;
+
+function softmax(vals){
+  const m=Math.max(...vals); const ex=vals.map(v=>Math.exp(v-m)); const s=ex.reduce((a,b)=>a+b,0); return ex.map(v=>v/s);
+}
+function dot(a,b){let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s;}
+function normalize(a){let s=0;for(const v of a)s+=v*v;s=Math.sqrt(s)||1;return Array.from(a,v=>v/s);}
+
+async function loadGeoClip(){
+  if(geoLoadingPromise)return geoLoadingPromise;
+  geoLoadingPromise=(async()=>{
+    setReelStatus('Loading the free GeoCLIP model… first use can take a while on iPhone.','');
+    geoVisionModel=await AutoModel.from_pretrained(GEOCLIP_MODEL,{model_file_name:'vision_model',dtype:'q4'});
+    geoLocationModel=await AutoModel.from_pretrained(GEOCLIP_MODEL,{model_file_name:'location_model',dtype:'q4'});
+    geoProcessor=await AutoProcessor.from_pretrained('openai/clip-vit-large-patch14');
+    const r=await fetch('https://huggingface.co/Xenova/geoclip-large-patch14/resolve/main/gps_gallery/coordinates_100K.json');
+    if(!r.ok)throw new Error('Could not load GeoCLIP GPS gallery');
+    geoGpsData=await r.json();
+  })();
+  try{return await geoLoadingPromise}catch(e){geoLoadingPromise=null;throw e;}
+}
+
+async function predictGeoClip(imageUrl){
+  await loadGeoClip();
+  const image=await RawImage.fromURL(imageUrl);
+  const inputs=await geoProcessor(image);
+  const out=await geoVisionModel(inputs);
+  const imgEmb=normalize(out.image_embeds.data);
+  const scores=[];
+  const batch=512;
+  const scale=Math.exp(3.681034803390503);
+  for(let i=0;i<geoGpsData.length;i+=batch){
+    const chunk=geoGpsData.slice(i,i+batch);
+    const loc=await geoLocationModel({location:new Tensor('float32',chunk.flat(),[chunk.length,2])});
+    const embeds=loc.location_embeds.normalize().tolist();
+    for(const e of embeds)scores.push(scale*dot(imgEmb,e));
+  }
+  const probs=softmax(scores);
+  return probs.map((score,i)=>({score,gps:geoGpsData[i]})).sort((a,b)=>b.score-a.score).slice(0,5);
+}
+
+async function analyzeReelWithAI(){
+  const url=document.getElementById('url').value.trim();
+  if(!url)return alert('Paste an Instagram Reel URL first.');
+  if(!AI_PROXY_URL){
+    setReelStatus('AI proxy is not configured yet. The free GeoCLIP engine is ready, but Instagram must first be accessed through the small proxy. Use Manual location for now.','error');
+    document.getElementById('reelForm').classList.remove('hidden');
+    document.getElementById('locationInput').focus();
+    return;
+  }
+  pendingReel={url};
+  document.getElementById('reelForm').classList.remove('hidden');
+  const btn=document.querySelector('#reelForm button'); if(btn)btn.disabled=true;
+  document.getElementById('aiResult').classList.remove('hidden');
+  document.getElementById('aiResult').innerHTML='<div class="status">🤖 Reading the Reel preview…</div>';
+  setReelStatus('Getting the public Reel preview…','');
+  try{
+    const r=await fetch(AI_PROXY_URL+'/thumbnail?url='+encodeURIComponent(url),{cache:'no-store'});
+    if(!r.ok){ let t=''; try{t=await r.text();}catch(_){} throw new Error(t||('Instagram preview is not accessible (HTTP '+r.status+')')); }
+    const blob=await r.blob();
+    const imageUrl=URL.createObjectURL(blob);
+    document.getElementById('aiResult').innerHTML='<div class="status">🧠 Running GeoCLIP locally on this device…</div>';
+    const results=await predictGeoClip(imageUrl);
+    URL.revokeObjectURL(imageUrl);
+    const best=results[0];
+    const htmlRows=results.slice(0,3).map((x,i)=>`<div style="margin-top:4px">${i+1}. ${x.gps[0].toFixed(4)}, ${x.gps[1].toFixed(4)} — ${(x.score*100).toFixed(1)}%</div>`).join('');
+    document.getElementById('aiResult').innerHTML=`<div class="status detected"><b>🤖 AI location estimate</b><br><span class="muted">Based on the public Reel preview. Verify before saving.</span><br><br>Coordinates: ${best.gps[0].toFixed(5)}, ${best.gps[1].toFixed(5)}<br>Model confidence: ${(best.score*100).toFixed(1)}%${htmlRows}</div>`;
+    const g=await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&lat='+best.gps[0]+'&lon='+best.gps[1],{headers:{'Accept':'application/json'}});
+    const geo=await g.json();
+    detectedLocation={lat:Number(best.gps[0]),lng:Number(best.gps[1]),location:geo.display_name||`${best.gps[0].toFixed(5)}, ${best.gps[1].toFixed(5)}`};
+    document.getElementById('locationInput').value=detectedLocation.location;
+    document.getElementById('saveBtn').disabled=false;
+    setReelStatus('AI found a probable location. Please verify it before saving.','detected');
+    if(map){if(window.pendingMarker)map.removeLayer(window.pendingMarker);window.pendingMarker=L.marker([detectedLocation.lat,detectedLocation.lng]).addTo(map).bindPopup('AI detected location').openPopup();map.setView([detectedLocation.lat,detectedLocation.lng],12);}
+  }catch(e){
+    console.error(e);
+    document.getElementById('aiResult').innerHTML='<div class="status error">⚠️ The Reel could not be analyzed automatically.<br>Please enter the location manually.</div>';
+    setReelStatus('Automatic detection failed. Enter the location manually.','error');
+  }finally{if(btn)btn.disabled=false;}
+}
+window.analyzeReelWithAI=analyzeReelWithAI;
 </script>
 </body>
 </html>
