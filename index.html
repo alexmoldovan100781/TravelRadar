@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.4.6 Exact Location</title>
+  <title>TravelRadar v2.4.7 Exact Location</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f5f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--accent:#2563eb;--border:#e5e7eb}
@@ -32,7 +32,7 @@
   </style>
 </head>
 <body>
-<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">v2.4.6 Local JSON Backup</span></header>
+<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">v2.4.7 Local JSON Backup</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -115,13 +115,13 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.4.6';
+const VERSION='v2.4.7';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 
 // =====================================================
 // STORAGE RECOVERY / MIGRATION
-// v2.4.6 scans the current origin's localStorage for
+// v2.4.7 scans the current origin's localStorage for
 // older TravelRadar pin arrays before using the active key.
 // Nothing is deleted from localStorage during recovery.
 // =====================================================
@@ -230,13 +230,14 @@ let userAccuracyCircle=null;
 let exactLocationEnabled=false;
 let alertCircles=[];
 let notificationCooldownMs=60000;
+let travelRadarOpenPinId=null;
 
 
 function save(){localStorage.setItem(KEY,JSON.stringify(places));render()}
 
 // =====================================================
 // LOCAL JSON BACKUP / RESTORE
-// v2.4.6 keeps normal operation in localStorage, but
+// v2.4.7 keeps normal operation in localStorage, but
 // provides an explicit portable text backup containing
 // ALL saved pins. Import merges pins instead of deleting
 // the current collection.
@@ -774,6 +775,10 @@ function render(){
     :'<div class="muted" style="padding:15px 0">No saved places in this radius.</div>';
 
   if(map){
+    // Preserve the currently open pin popup across marker refreshes.
+    const reopenPinId=travelRadarOpenPinId;
+    map._travelRadarRendering=true;
+
     markers.forEach(m=>map.removeLayer(m));
     markers=[];
     alertCircles.forEach(c=>map.removeLayer(c));
@@ -788,6 +793,17 @@ function render(){
       const marker=L.marker([p.lat,p.lng]).addTo(map).bindPopup(
         `<b>${escapeHtml(p.title)}</b><br>${escapeHtml(p.location)}${reelLink}${deleteLink}`
       );
+
+      marker.on('popupopen',()=>{
+        travelRadarOpenPinId=p.id;
+      });
+
+      marker.on('popupclose',()=>{
+        if(!map._travelRadarRendering){
+          travelRadarOpenPinId=null;
+        }
+      });
+
       markers.push(marker);
       const circle=L.circle([p.lat,p.lng],{
         radius:alertRadius*1000,
@@ -800,6 +816,24 @@ function render(){
       );
       alertCircles.push(circle);
     });
+
+    map._travelRadarRendering=false;
+
+    // Reopen the pin popup after a render() refresh (for example after
+    // a GPS/geofence update). This prevents the popup from disappearing
+    // while the user is trying to tap View Reel or Delete.
+    if(reopenPinId!==null && reopenPinId!==undefined){
+      const markerToReopen=markers.find(m=>{
+        const ll=m.getLatLng();
+        const place=places.find(p=>p.id===reopenPinId);
+        return place &&
+          Math.abs(ll.lat-Number(place.lat))<0.000001 &&
+          Math.abs(ll.lng-Number(place.lng))<0.000001;
+      });
+      if(markerToReopen){
+        markerToReopen.openPopup();
+      }
+    }
 
     // Show the user's real GPS position. No fallback location is ever used.
     if(user && isValidUserCoordinate(user.lat,user.lng)){
