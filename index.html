@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar V2.2 Instagram Location</title>
+  <title>TravelRadar V2.3 Instagram Location Fallback</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f5f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--accent:#2563eb;--border:#e5e7eb}
@@ -32,7 +32,7 @@
   </style>
 </head>
 <body>
-<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V2.2 Instagram Location</span></header>
+<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V2.3 Instagram Location Fallback</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -872,17 +872,14 @@ function renderLocationCandidates(
 
 async function selectLocationCandidate(index){
 
-  if(
-    !detectedCandidates[index] ||
-    !pendingReel
-  ){
+  const candidate =
+    detectedCandidates[index];
+
+  if(!candidate){
     return;
   }
 
   selectedCandidateIndex=index;
-
-  const candidate=
-    detectedCandidates[index];
 
   document
     .querySelectorAll('.candidateBtn')
@@ -890,199 +887,261 @@ async function selectLocationCandidate(index){
       btn=>btn.classList.remove('selected')
     );
 
-  const selectedButton=
+  const selectedBtn =
     document.getElementById(
-      'candidate-'+index
+      `candidate-${index}`
     );
 
-  if(selectedButton){
-    selectedButton.classList.add('selected');
+  if(selectedBtn){
+    selectedBtn.classList.add('selected');
   }
 
   setReelStatus(
-    'Mapping "'+candidate+'"…',
-    ''
+    `Mapping ${candidate}…`,
+    'working'
   );
-
-  document.getElementById(
-    'saveBtn'
-  ).disabled=true;
 
   try{
 
     /*
-     * V2.2:
-     * If the user selected the native Instagram location,
-     * use the Instagram location ID/name directly.
+     * V2.3
      *
-     * The Worker may not yet return coordinates, so only in that
-     * case do we geocode the native Instagram place name.
+     * Native Instagram locations are authoritative for the
+     * saved place name / Instagram location ID, but the native
+     * location name is not always searchable in Nominatim.
+     *
+     * Example:
+     *   Instagram location: "Bar Italia - Salo"
+     *   location_id: 16547288
+     *   caption candidate: "Salò"
+     *
+     * If the native place cannot be mapped, we use the best
+     * alternative location candidate for the map coordinates,
+     * while preserving the native Instagram location as the
+     * saved location.
      */
+
     const isNativeInstagram =
       nativeInstagramLocation &&
       candidate.toLowerCase() ===
         nativeInstagramLocation.name.toLowerCase();
 
     let result=null;
+    let mapCandidate=candidate;
 
-    if(
-      isNativeInstagram &&
-      Number.isFinite(nativeInstagramLocation.latitude) &&
-      Number.isFinite(nativeInstagramLocation.longitude)
+    /*
+     * Build fallback candidates.
+     * Prefer:
+     * 1. Native Instagram name
+     * 2. Other candidates from the Reel
+     */
+    const fallbackCandidates=[
+      candidate,
+      ...detectedCandidates.filter(
+        (_,i)=>i!==index
+      )
+    ];
+
+    /*
+     * If this is a native Instagram location, try the native
+     * name first. If that fails, try the other detected places.
+     */
+    for(
+      const candidateToMap of fallbackCandidates
     ){
-      detectedLocation={
-        lat:nativeInstagramLocation.latitude,
-        lng:nativeInstagramLocation.longitude,
-        location:nativeInstagramLocation.name,
-        locationId:nativeInstagramLocation.id || null,
-        locationSource:'instagram_location'
-      };
-    }else{
 
       const query =
-        /\b(?:del|sul)\s+Garda\b/i.test(candidate)
-          ? candidate+', Italy'
-          : candidate;
+        /\b(?:del|sul)\s+Garda\b/i.test(
+          candidateToMap
+        )
+          ? candidateToMap+', Italy'
+          : candidateToMap;
 
-      const response=
-        await fetch(
-          'https://nominatim.openstreetmap.org/search?'+
-          new URLSearchParams({
-            format:'jsonv2',
-            limit:'5',
-            addressdetails:'1',
-            'accept-language':'en',
-            q:query
-          }),
-          {
-            headers:{
-              'Accept':'application/json'
+      try{
+
+        const response=
+          await fetch(
+            'https://nominatim.openstreetmap.org/search?'+
+            new URLSearchParams({
+              format:'jsonv2',
+              limit:'5',
+              addressdetails:'1',
+              'accept-language':'en',
+              q:query
+            }),
+            {
+              headers:{
+                'Accept':'application/json'
+              }
             }
-          }
-        );
-
-      if(!response.ok){
-        throw new Error(
-          'Geocoding request failed.'
-        );
-      }
-
-      const results=
-        await response.json();
-
-      if(!results.length){
-        throw new Error(
-          'The selected location could not be mapped.'
-        );
-      }
-
-      /*
-       * Prefer a settlement result for municipality-style
-       * candidates, but never silently change the user's
-       * selected candidate.
-       */
-      result=results[0];
-
-      if(
-        /\b(?:del|sul)\s+Garda\b/i.test(candidate)
-      ){
-
-        const settlement=
-          results.find(r=>
-            ['city','town','village'].includes(
-              String(r.type||'').toLowerCase()
-            )
           );
 
-        if(settlement){
-          result=settlement;
+        if(!response.ok){
+          continue;
         }
-      }
 
-      detectedLocation={
-        lat:Number(result.lat),
-        lng:Number(result.lon),
-        location:result.display_name ||
-          candidate,
-        locationId:isNativeInstagram
-          ? (nativeInstagramLocation.id || null)
-          : null,
-        locationSource:isNativeInstagram
-          ? 'instagram_location'
-          : 'geocoded_candidate'
-      };
+        const results=
+          await response.json();
+
+        if(!results.length){
+          continue;
+        }
+
+        /*
+         * Prefer settlement results for municipality/place
+         * candidates, while keeping the actual selected name.
+         */
+        result=results[0];
+        mapCandidate=candidateToMap;
+
+        if(
+          /\b(?:del|sul)\s+Garda\b/i.test(
+            candidateToMap
+          )
+        ){
+
+          const settlement=
+            results.find(r=>
+              ['city','town','village'].includes(
+                String(r.type||'').toLowerCase()
+              )
+            );
+
+          if(settlement){
+            result=settlement;
+          }
+        }
+
+        break;
+
+      }catch(_){}
     }
 
-    document.getElementById(
-      'locationInput'
-    ).value=
-      detectedLocation.location;
-
-    document.getElementById(
-      'saveBtn'
-    ).disabled=false;
-
-    setReelStatus(
-      'Selected: '+detectedLocation.location,
-      'detected'
-    );
-
-    const aiResult=
-      document.getElementById(
-        'aiResult'
+    if(!result){
+      throw new Error(
+        'The selected location could not be mapped.'
       );
+    }
 
-    aiResult.innerHTML=
+    /*
+     * IMPORTANT:
+     *
+     * If the selected candidate is the native Instagram
+     * location, preserve that as the logical/saved location.
+     *
+     * Coordinates may come from a fallback candidate such as
+     * "Salò".
+     */
+    detectedLocation={
+      lat:Number(result.lat),
+      lng:Number(result.lon),
+
+      location:
+        isNativeInstagram
+          ? nativeInstagramLocation.name
+          : result.display_name || candidate,
+
+      locationId:
+        isNativeInstagram
+          ? (nativeInstagramLocation.id || null)
+          : null,
+
+      locationSource:
+        isNativeInstagram
+          ? 'instagram_location'
+          : 'geocoded_candidate',
+
+      mapLocation:
+        result.display_name || mapCandidate,
+
+      mapCandidate
+    };
+
+    /*
+     * Show exactly what happened when the Instagram place had
+     * to use a fallback map position.
+     */
+    const fallbackNote =
+      isNativeInstagram &&
+      mapCandidate.toLowerCase() !==
+        candidate.toLowerCase()
+        ? `
+          <br>
+          <span class="muted">
+            📍 Map position: ${escapeHtml(mapCandidate)}
+          </span>
+        `
+        : '';
+
+    document.getElementById('aiResult').innerHTML=
       `<div class="status detected">
         <b>✓ Location selected</b>
         <br><br>
-        <b>${escapeHtml(candidate)}</b>
-        <br>
-        ${escapeHtml(
+        <b>${escapeHtml(
           detectedLocation.location
-        )}
-        ${detectedLocation.locationSource === 'instagram_location'
-          ? '<br><span class="muted">✓ Native Instagram location</span>'
-          : ''}
-        <br>
-        <span class="muted">
-          ${detectedLocation.lat.toFixed(5)},
-          ${detectedLocation.lng.toFixed(5)}
-        </span>
+        )}</b>
+
+        ${
+          isNativeInstagram
+            ? `
+              <br>
+              <span class="muted">
+                ✓ Native Instagram location
+                ${
+                  detectedLocation.locationId
+                    ? ` · ID ${escapeHtml(
+                        detectedLocation.locationId
+                      )}`
+                    : ''
+                }
+              </span>
+            `
+            : ''
+        }
+
+        ${fallbackNote}
+
         <br><br>
-        <button
-          type="button"
-          class="secondary"
-          onclick="showCandidateChooser()"
-        >
-          Change selection
-        </button>
+        <span class="muted">
+          ${
+            Number.isFinite(
+              detectedLocation.lat
+            ) &&
+            Number.isFinite(
+              detectedLocation.lng
+            )
+              ? 'Location mapped successfully.'
+              : ''
+          }
+        </span>
       </div>`;
 
-    showPendingLocation(
-      'Selected Reel location'
+    setReelStatus(
+      'Location mapped. You can save it.',
+      'detected'
     );
+
+    document.getElementById(
+      'saveReelBtn'
+    ).disabled=false;
 
   }catch(error){
 
-    detectedLocation=null;
-
-    document.getElementById(
-      'saveBtn'
-    ).disabled=true;
-
     setReelStatus(
-      error.message ||
-      'Could not map the selected location.',
+      error?.message ||
+        'Unable to map the selected location.',
       'error'
     );
 
-    document.getElementById(
-      'locationInput'
-    ).value=candidate;
+    document.getElementById('aiResult').innerHTML=
+      `<div class="status error">
+        ${escapeHtml(
+          error?.message ||
+          'Unable to map the selected location.'
+        )}
+      </div>`;
   }
 }
-
 
 function showCandidateChooser(){
 
