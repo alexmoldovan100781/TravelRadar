@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar V2.2 Facebook Reels · Pin Safe</title>
+  <title>TravelRadar V2.4 Facebook Share Resolve · Pin Safe</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f5f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--accent:#2563eb;--border:#e5e7eb}
@@ -32,10 +32,14 @@
   </style>
 </head>
 <body>
-<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V2.2 Facebook Reels · Pin Safe</span></header>
+<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V2.4 Facebook Share · Pin Safe</span></header>
 <main>
   <section class="card">
     <div class="row"><input id="url" class="input grow" placeholder="Paste Instagram or Facebook Reel URL…"><button onclick="prepareReel()">Add</button></div>
+    <div id="facebookResolve" class="hidden" style="margin-top:10px">
+      <div class="status">Facebook share links cannot be resolved by the Worker without your Facebook session. Open the link in Facebook, copy the final Reel link, then paste it below.</div>
+      <div class="row" style="margin-top:8px"><button class="secondary" onclick="openFacebookShare()">Open Facebook ↗</button><input id="resolvedUrl" class="input grow" placeholder="Paste the final facebook.com/reel/... link…"><button onclick="useResolvedFacebookUrl()">Use</button></div>
+    </div>
     
 
     <div id="reelForm" class="hidden" style="margin-top:14px">
@@ -182,6 +186,52 @@ function getReelPlatform(url){
   }
 }
 
+function isFacebookShareUrl(url){
+  try{
+    const u=new URL(url);
+    const host=u.hostname.toLowerCase().replace(/^www\./,'');
+    const path=u.pathname.toLowerCase();
+    return host==='facebook.com' && /^\/share\/(?:r\/)?[^/]+/.test(path);
+  }catch(e){
+    return false;
+  }
+}
+
+function openFacebookShare(){
+  const url=document.getElementById('url').value.trim();
+  if(!isFacebookShareUrl(url)){
+    alert('Paste a Facebook share link first.');
+    return;
+  }
+  window.open(url,'_blank','noopener,noreferrer');
+  setReelStatus('Facebook opened. Copy the final Reel link and paste it in the field above.','');
+}
+
+function useResolvedFacebookUrl(){
+  const resolved=document.getElementById('resolvedUrl').value.trim();
+  if(!resolved){
+    alert('Paste the final Facebook Reel URL first.');
+    return;
+  }
+  if(!isSupportedReelUrl(resolved) || isFacebookShareUrl(resolved)){
+    alert('Please paste the final Facebook Reel URL, for example facebook.com/reel/...');
+    return;
+  }
+  document.getElementById('url').value=resolved;
+  document.getElementById('facebookResolve').classList.add('hidden');
+  pendingReel={url:resolved};
+  detectedLocation=null;
+  detectedCandidates=[];
+  selectedCandidateIndex=-1;
+  document.getElementById('reelNotifyRadius').value='2';
+  document.getElementById('reelCustomRadius').value='';
+  document.getElementById('reelCustomRadius').classList.add('hidden');
+  document.getElementById('reelForm').classList.remove('hidden');
+  document.getElementById('saveBtn').disabled=true;
+  setReelStatus('Final Facebook Reel URL ready. Tap 📍 Detect from Reel.','');
+  document.getElementById('locationInput').focus();
+}
+
 function prepareReel(){
   const url=document.getElementById('url').value.trim();
   if(!url){document.getElementById('url').focus();return}
@@ -189,6 +239,19 @@ function prepareReel(){
     alert('Please enter a valid Instagram or Facebook Reel URL.');
     return;
   }
+
+  // Facebook /share/r/... links are resolved inside the user's Facebook session.
+  // The Cloudflare Worker cannot access that session, so ask the user to copy the
+  // final Reel URL. Existing pins are never touched by this flow.
+  if(isFacebookShareUrl(url)){
+    pendingReel={url};
+    document.getElementById('facebookResolve').classList.remove('hidden');
+    document.getElementById('resolvedUrl').value='';
+    setReelStatus('Open Facebook, copy the final Reel link, then tap Use.','');
+    return;
+  }
+
+  document.getElementById('facebookResolve').classList.add('hidden');
   pendingReel={url};
   detectedLocation=null;
   detectedCandidates=[];
@@ -306,6 +369,10 @@ function saveReel(){
 
 function clearReel(){
   pendingReel=null;
+  const resolver=document.getElementById('facebookResolve');
+  if(resolver) resolver.classList.add('hidden');
+  const resolved=document.getElementById('resolvedUrl');
+  if(resolved) resolved.value='';
   detectedLocation=null;
   detectedCandidates=[];
   selectedCandidateIndex=-1;
@@ -517,7 +584,7 @@ function render(){
       <div class="muted">${escapeHtml(p.location)} · ${distance(user.lat,user.lng,p.lat,p.lng).toFixed(1)} km</div>
       <div class="muted">🔔 Alert radius: ${formatRadius(Number(p.notifyRadius||2))}</div>
       <div style="margin-top:5px">
-        <a href="${escapeHtml(p.url||'#')}" target="_blank" rel="noopener noreferrer">Open ${escapeHtml(p.platform||getReelPlatform(p.url)||'Reel')} ↗</a>
+        <a href="${escapeHtml(p.url)}" target="_blank">Open ${escapeHtml(p.platform||'Reel')} ↗</a>
         ${p.url && p.url !== '#' ? `<button class="notifyBtn ${p.notifyEnabled?'on':''}" onclick="toggleNotification(${p.id})">${p.notifyEnabled?'🔔 On':'🔔 Notify'}</button>` : ''}
         <button class="notifyBtn" onclick="deletePlace(${p.id})" style="background:#fee2e2;color:#991b1b">🗑 Delete</button>
       </div>
@@ -534,7 +601,7 @@ function render(){
       const reelUrl=safeUrl(p.url);
       const alertRadius=Number(p.notifyRadius||2);
       const reelLink=reelUrl!=='#'
-        ? `<br><br><a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" style="display:inline-block;font-weight:600;text-decoration:none;background:#eef2ff;color:#1d4ed8;padding:8px 10px;border-radius:9px">🔗 Open ${escapeHtml(p.platform||getReelPlatform(p.url)||'Reel')} ↗</a>`
+        ? `<br><br><a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" style="font-weight:600">🔗 Open ${escapeHtml(p.platform||'Reel')} ↗</a>`
         : '';
       const deleteLink=`<br><button onclick="deletePlace(${p.id})" style="margin-top:10px;background:#fee2e2;color:#991b1b;padding:7px 10px;border-radius:8px;border:0;font-weight:600">🗑 Delete pin</button>`;
       const marker=L.marker([p.lat,p.lng]).addTo(map).bindPopup(
