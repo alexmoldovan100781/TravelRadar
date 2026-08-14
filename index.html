@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar V2.4.2 All Pins Zoom</title>
+  <title>TravelRadar V2.4.1 Instagram URL Fix</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f5f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--accent:#2563eb;--border:#e5e7eb}
@@ -32,7 +32,7 @@
   </style>
 </head>
 <body>
-<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V2.4.2 All Pins Zoom</span></header>
+<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V2.4.1 Instagram URL Fix</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -69,7 +69,7 @@
 
   <section class="card">
     <div class="row"><div class="grow"><b>Nearby</b><div id="locationStatus" class="muted">Getting your location…</div></div>
-      <select id="radius" class="input" style="width:auto" onchange="handleRadiusChange()"><option value="0.5">500 m</option><option value="2">2 km</option><option value="5" selected>5 km</option><option value="10">10 km</option><option value="25">25 km</option><option value="50">50 km</option><option value="all">All</option></select>
+      <select id="radius" class="input" style="width:auto" onchange="render()"><option value="0.5">500 m</option><option value="2">2 km</option><option value="5" selected>5 km</option><option value="10">10 km</option><option value="25">25 km</option><option value="50">50 km</option><option value="all">All</option></select>
     </div>
     <div class="chips" style="margin-top:10px">
       <button class="chip active" onclick="filterCat('All',this)">All</button><button class="chip" onclick="filterCat('Food',this)">🍝 Food</button><button class="chip" onclick="filterCat('Nature',this)">🌲 Nature</button><button class="chip" onclick="filterCat('Hotel',this)">🏨 Hotel</button><button class="chip" onclick="filterCat('Beach',this)">🏖️ Beach</button>
@@ -88,16 +88,114 @@
 
   <section class="card"><b>Map</b><div id="map"></div></section>
 
-  <section class="card"><div class="row"><div class="grow"><b>Saved places</b><div class="muted" id="count"></div></div><button class="secondary" onclick="seed()">Demo data</button></div><div id="places"></div></section>
+  <section class="card"><div class="row"><div class="grow"><b>Saved places</b><div class="muted" id="count"></div></div><button class="secondary" onclick="seed()">Demo data</button></div><div id="storageRecovery" class="muted" style="display:none;margin-top:8px"></div><div id="places"></div></section>
 </main>
 <nav><button class="primary" onclick="scrollTo(0,0)">⌖<br><small>Radar</small></button><button onclick="document.getElementById('url').focus()">＋<br><small>Add Reel</small></button><button onclick="alert('Settings will be expanded in V2.')">⚙<br><small>Settings</small></button></nav>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
+const VERSION='2.4.3';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user={lat:45.4642,lng:9.19}, map, markers=[];
-let places=JSON.parse(localStorage.getItem(KEY)||'[]');
+
+// =====================================================
+// STORAGE RECOVERY / MIGRATION
+// V2.4.3 scans the current origin's localStorage for
+// older TravelRadar pin arrays before using the active key.
+// Nothing is deleted from localStorage during recovery.
+// =====================================================
+function isPinLikeObject(p){
+  if(!p || typeof p!=='object') return false;
+  const lat=Number(p.lat ?? p.latitude);
+  const lng=Number(p.lng ?? p.lon ?? p.longitude);
+  if(!Number.isFinite(lat)||!Number.isFinite(lng)||lat<-90||lat>90||lng<-180||lng>180) return false;
+  return !!(p.location || p.title || p.name || p.url || p.platform || p.category);
+}
+
+function normalizeStoredPin(p,index){
+  const lat=Number(p.lat ?? p.latitude);
+  const lng=Number(p.lng ?? p.lon ?? p.longitude);
+  return {
+    id:p.id ?? ('recovered_'+Date.now()+'_'+index+'_'+Math.random().toString(36).slice(2,8)),
+    title:p.title || (p.location ? 'Saved place' : 'Recovered pin'),
+    category:p.category || 'Travel',
+    url:p.url || p.reelUrl || '#',
+    platform:p.platform || null,
+    lat,lng,
+    location:p.location || p.name || p.display_name || 'Saved location',
+    locationId:p.locationId ?? p.location_id ?? null,
+    locationSource:p.locationSource ?? p.source ?? null,
+    notifyEnabled:typeof p.notifyEnabled==='boolean' ? p.notifyEnabled : false,
+    notifyRadius:Number.isFinite(Number(p.notifyRadius)) ? Number(p.notifyRadius) : 2,
+    insideGeofence:!!p.insideGeofence
+  };
+}
+
+function samePin(a,b){
+  if(!a||!b) return false;
+  if(a.locationId && b.locationId && String(a.locationId)===String(b.locationId)) return true;
+  if(a.url && b.url && a.url!=='#' && b.url!=='#' && a.url===b.url) return true;
+  return Number.isFinite(Number(a.lat)) && Number.isFinite(Number(a.lng)) &&
+    Number.isFinite(Number(b.lat)) && Number.isFinite(Number(b.lng)) &&
+    Math.abs(Number(a.lat)-Number(b.lat))<0.00005 &&
+    Math.abs(Number(a.lng)-Number(b.lng))<0.00005;
+}
+
+function recoverStoredPlaces(){
+  const recovered=[];
+  const sources=[];
+  for(let i=0;i<localStorage.length;i++){
+    const key=localStorage.key(i);
+    if(!key) continue;
+    let raw;
+    try{ raw=JSON.parse(localStorage.getItem(key)); }catch(e){ continue; }
+    const arrays=[];
+    if(Array.isArray(raw)) arrays.push(raw);
+    else if(raw && typeof raw==='object'){
+      for(const value of Object.values(raw)){
+        if(Array.isArray(value)) arrays.push(value);
+      }
+    }
+    for(const arr of arrays){
+      const pins=arr.filter(isPinLikeObject).map((p,n)=>normalizeStoredPin(p,n));
+      if(pins.length){
+        sources.push({key,count:pins.length});
+        for(const pin of pins){
+          if(!recovered.some(x=>samePin(x,pin))) recovered.push(pin);
+        }
+      }
+    }
+  }
+  return {places:recovered,sources};
+}
+
+function loadPlaces(){
+  let current=[];
+  try{
+    const raw=JSON.parse(localStorage.getItem(KEY)||'[]');
+    if(Array.isArray(raw)) current=raw.filter(isPinLikeObject).map((p,i)=>normalizeStoredPin(p,i));
+  }catch(e){}
+
+  const recovery=recoverStoredPlaces();
+  const merged=[];
+  [...current,...recovery.places].forEach(pin=>{
+    if(!merged.some(x=>samePin(x,pin))) merged.push(pin);
+  });
+
+  const changed=merged.length!==current.length;
+  if(changed){
+    try{ localStorage.setItem(KEY,JSON.stringify(merged)); }catch(e){}
+  }
+  window.travelRadarRecovery={
+    recovered:Math.max(0,merged.length-current.length),
+    total:merged.length,
+    sources:recovery.sources
+  };
+  return merged;
+}
+
+let places=loadPlaces();
 let pendingReel=null;
 let detectedLocation=null;
 let detectedCandidates=[];
@@ -476,19 +574,6 @@ function seed(){
   save();
 }
 
-function handleRadiusChange(){
-  const value=document.getElementById('radius').value;
-
-  if(value==='all'){
-    cat='All';
-    document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));
-    const allChip=document.querySelector('.chip[onclick*="filterCat(\'All\'"]');
-    if(allChip) allChip.classList.add('active');
-  }
-
-  render();
-}
-
 function filterCat(c,el){
   cat=c;
   document.querySelectorAll('.chip').forEach(x=>x.classList.remove('active'));
@@ -521,6 +606,12 @@ function render(){
   document.getElementById('count').textContent=
     shown.length+' place'+(shown.length===1?'':'s')+
     (allPlaces ? ' · all saved places' : ' within '+r+' km');
+  const recovery=document.getElementById('storageRecovery');
+  if(recovery){
+    const rr=window.travelRadarRecovery||{};
+    recovery.textContent=rr.recovered>0 ? ('Recovered '+rr.recovered+' older pin'+(rr.recovered===1?'':'s')+' from local storage.') : '';
+    recovery.style.display=rr.recovered>0?'block':'none';
+  }
   document.getElementById('places').innerHTML=shown.length
     ?shown.map(p=>`<div class="place">
     <div class="dot">📍</div>
@@ -566,22 +657,10 @@ function render(){
     });
 
     if(allPlaces && shown.length){
-      if(shown.length===1){
-        map.setView(
-          [shown[0].lat,shown[0].lng],
-          10,
-          {animate:true}
-        );
-      }else{
-        const bounds=L.latLngBounds(
-          shown.map(p=>[p.lat,p.lng])
-        );
-        map.fitBounds(bounds,{
-          padding:[60,60],
-          maxZoom:10,
-          animate:true
-        });
-      }
+      const bounds=L.latLngBounds(
+        shown.map(p=>[p.lat,p.lng])
+      );
+      map.fitBounds(bounds,{padding:[30,30],maxZoom:13});
     }
   }
 }
