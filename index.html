@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar V2.1 Facebook Reels</title>
+  <title>TravelRadar V2.2 Instagram Location</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f5f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--accent:#2563eb;--border:#e5e7eb}
@@ -32,7 +32,7 @@
   </style>
 </head>
 <body>
-<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V2.1 Facebook Reels</span></header>
+<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V2.2 Instagram Location</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -102,6 +102,7 @@ let pendingReel=null;
 let detectedLocation=null;
 let detectedCandidates=[];
 let selectedCandidateIndex=-1;
+let nativeInstagramLocation=null;
 let notificationPermission=false;
 let geoWatchId=null;
 let lastUserPosition=null;
@@ -157,6 +158,7 @@ function prepareReel(){
   detectedLocation=null;
   detectedCandidates=[];
   selectedCandidateIndex=-1;
+  nativeInstagramLocation=null;
   document.getElementById('reelNotifyRadius').value='2';
   document.getElementById('reelCustomRadius').value='';
   document.getElementById('reelCustomRadius').classList.add('hidden');
@@ -257,6 +259,8 @@ function saveReel(){
     lat:detectedLocation.lat,
     lng:detectedLocation.lng,
     location:detectedLocation.location,
+    locationId:detectedLocation.locationId || null,
+    locationSource:detectedLocation.locationSource || null,
     notifyEnabled:true,
     notifyRadius:notifyRadius,
     insideGeofence:false
@@ -279,6 +283,7 @@ function clearReel(){
   detectedLocation=null;
   detectedCandidates=[];
   selectedCandidateIndex=-1;
+  nativeInstagramLocation=null;
   document.getElementById('reelForm').classList.add('hidden');
   document.getElementById('locationInput').value='';
   document.getElementById('saveBtn').disabled=true;
@@ -576,15 +581,16 @@ async function analyzeReelWithAI(){
   detectedLocation=null;
   detectedCandidates=[];
   selectedCandidateIndex=-1;
+  nativeInstagramLocation=null;
 
   document.getElementById('reelForm').classList.remove('hidden');
   document.getElementById('saveBtn').disabled=true;
   document.getElementById('aiResult').classList.remove('hidden');
   document.getElementById('aiResult').innerHTML=
-    '<div class="status">🔎 Reading the public Reel caption…</div>';
+    '<div class="status">🔎 Reading the public Reel metadata…</div>';
 
   setReelStatus(
-    'Reading the public Reel caption…',
+    'Reading the public Reel metadata…',
     ''
   );
 
@@ -626,22 +632,55 @@ async function analyzeReelWithAI(){
           .filter(Boolean)
       : [];
 
-    // Remove duplicates while preserving order.
-    detectedCandidates=[
-      ...new Set(candidates)
-    ];
-
     const caption=
       data.caption ||
       data.og_description ||
       '';
+
+    /*
+     * V2.2:
+     * Prefer a native Instagram location returned by Worker 4.8.
+     * This is stronger than a location inferred from caption text.
+     *
+     * If the Worker has a native location, keep its name + ID and
+     * use its candidate as the first selectable location.
+     */
+    const nativeName =
+      data.platform === 'Instagram' &&
+      data.location
+        ? cleanCandidateText(data.location)
+        : '';
+
+    if(nativeName){
+      nativeInstagramLocation={
+        name:nativeName,
+        id:data.location_id || null,
+        latitude:Number.isFinite(Number(data.location_latitude))
+          ? Number(data.location_latitude)
+          : null,
+        longitude:Number.isFinite(Number(data.location_longitude))
+          ? Number(data.location_longitude)
+          : null
+      };
+    }
+
+    const orderedCandidates = nativeName
+      ? [nativeName, ...candidates]
+      : candidates;
+
+    // Remove duplicates while preserving order.
+    detectedCandidates=[
+      ...new Set(
+        orderedCandidates.filter(Boolean)
+      )
+    ];
 
     // No candidates at all.
     if(!detectedCandidates.length){
 
       document.getElementById('aiResult').innerHTML=
         `<div class="status error">
-          ⚠️ No location candidates were found in the Reel caption.
+          ⚠️ No location candidates were found in the Reel.
           <br><br>
           <span class="muted">
             Enter the location manually below.
@@ -662,10 +701,8 @@ async function analyzeReelWithAI(){
 
     /*
      * IMPORTANT:
-     * We deliberately do NOT automatically accept the Worker's
-     * geocoded result anymore.
-     *
-     * The user chooses the final candidate.
+     * We still let the user choose the final location.
+     * Native Instagram location is shown first and clearly marked.
      */
 
     document.getElementById('locationInput').value='';
@@ -677,7 +714,9 @@ async function analyzeReelWithAI(){
     );
 
     setReelStatus(
-      'Choose the location you want to save.',
+      nativeName
+        ? 'Instagram location detected. Choose the location you want to save.'
+        : 'Choose the location you want to save.',
       'detected'
     );
 
@@ -753,20 +792,32 @@ function renderLocationCandidates(
   caption
 ){
 
+  const nativeName =
+    nativeInstagramLocation?.name || '';
+
   const list=candidates.map(
-    (candidate,index)=>`
-      <button
-        type="button"
-        class="candidateBtn"
-        id="candidate-${index}"
-        onclick="selectLocationCandidate(${index})"
-      >
-        📍 ${escapeHtml(candidate)}
-        ${index===0
-          ? '<small>Suggested first — you choose whether to use it.</small>'
-          : ''}
-      </button>
-    `
+    (candidate,index)=>{
+      const isNative =
+        nativeName &&
+        candidate.toLowerCase() ===
+          nativeName.toLowerCase();
+
+      return `
+        <button
+          type="button"
+          class="candidateBtn"
+          id="candidate-${index}"
+          onclick="selectLocationCandidate(${index})"
+        >
+          📍 ${escapeHtml(candidate)}
+          ${isNative
+            ? '<small>✓ Instagram location — verified location attached to the Reel.</small>'
+            : index===0
+              ? '<small>Suggested first — you choose whether to use it.</small>'
+              : ''}
+        </button>
+      `;
+    }
   ).join('');
 
   const workerBest=
@@ -786,14 +837,30 @@ function renderLocationCandidates(
        </span>`
     : '';
 
+  const nativeInfo =
+    nativeName
+      ? `<div style="margin:8px 0 2px;padding:9px 10px;border-radius:10px;background:#f0fdf4;color:#166534">
+           <b>✓ Native Instagram location detected</b>
+           <br>
+           <span class="muted" style="color:#166534">
+             ${escapeHtml(nativeName)}
+             ${nativeInstagramLocation?.id
+               ? ` · ID ${escapeHtml(nativeInstagramLocation.id)}`
+               : ''}
+           </span>
+         </div>`
+      : '';
+
   document.getElementById('aiResult').innerHTML=
     `<div class="status detected">
       <b>📍 Choose the location</b>
       <br>
       <span class="muted">
-        TravelRadar found these location clues in the caption.
-        Select the one you want to use.
+        ${nativeName
+          ? 'TravelRadar found the location attached directly to the Instagram Reel, plus any other location clues.'
+          : 'TravelRadar found these location clues in the caption. Select the one you want to use.'}
       </span>
+      ${nativeInfo}
       <div class="candidateList">
         ${list}
       </div>
@@ -844,75 +911,107 @@ async function selectLocationCandidate(index){
   try{
 
     /*
-     * Geocode the USER'S selection, not the Worker's
-     * previously selected result.
+     * V2.2:
+     * If the user selected the native Instagram location,
+     * use the Instagram location ID/name directly.
+     *
+     * The Worker may not yet return coordinates, so only in that
+     * case do we geocode the native Instagram place name.
      */
-    const query =
-      /\b(?:del|sul)\s+Garda\b/i.test(candidate)
-        ? candidate+', Italy'
-        : candidate;
+    const isNativeInstagram =
+      nativeInstagramLocation &&
+      candidate.toLowerCase() ===
+        nativeInstagramLocation.name.toLowerCase();
 
-    const response=
-      await fetch(
-        'https://nominatim.openstreetmap.org/search?'+
-        new URLSearchParams({
-          format:'jsonv2',
-          limit:'5',
-          addressdetails:'1',
-          'accept-language':'en',
-          q:query
-        }),
-        {
-          headers:{
-            'Accept':'application/json'
-          }
-        }
-      );
-
-    if(!response.ok){
-      throw new Error(
-        'Geocoding request failed.'
-      );
-    }
-
-    const results=
-      await response.json();
-
-    if(!results.length){
-      throw new Error(
-        'The selected location could not be mapped.'
-      );
-    }
-
-    /*
-     * Prefer a settlement result for municipality-style
-     * candidates, but never silently change the user's
-     * selected candidate.
-     */
-    let result=results[0];
+    let result=null;
 
     if(
-      /\b(?:del|sul)\s+Garda\b/i.test(candidate)
+      isNativeInstagram &&
+      Number.isFinite(nativeInstagramLocation.latitude) &&
+      Number.isFinite(nativeInstagramLocation.longitude)
     ){
+      detectedLocation={
+        lat:nativeInstagramLocation.latitude,
+        lng:nativeInstagramLocation.longitude,
+        location:nativeInstagramLocation.name,
+        locationId:nativeInstagramLocation.id || null,
+        locationSource:'instagram_location'
+      };
+    }else{
 
-      const settlement=
-        results.find(r=>
-          ['city','town','village'].includes(
-            String(r.type||'').toLowerCase()
-          )
+      const query =
+        /\b(?:del|sul)\s+Garda\b/i.test(candidate)
+          ? candidate+', Italy'
+          : candidate;
+
+      const response=
+        await fetch(
+          'https://nominatim.openstreetmap.org/search?'+
+          new URLSearchParams({
+            format:'jsonv2',
+            limit:'5',
+            addressdetails:'1',
+            'accept-language':'en',
+            q:query
+          }),
+          {
+            headers:{
+              'Accept':'application/json'
+            }
+          }
         );
 
-      if(settlement){
-        result=settlement;
+      if(!response.ok){
+        throw new Error(
+          'Geocoding request failed.'
+        );
       }
-    }
 
-    detectedLocation={
-      lat:Number(result.lat),
-      lng:Number(result.lon),
-      location:result.display_name ||
-        candidate
-    };
+      const results=
+        await response.json();
+
+      if(!results.length){
+        throw new Error(
+          'The selected location could not be mapped.'
+        );
+      }
+
+      /*
+       * Prefer a settlement result for municipality-style
+       * candidates, but never silently change the user's
+       * selected candidate.
+       */
+      result=results[0];
+
+      if(
+        /\b(?:del|sul)\s+Garda\b/i.test(candidate)
+      ){
+
+        const settlement=
+          results.find(r=>
+            ['city','town','village'].includes(
+              String(r.type||'').toLowerCase()
+            )
+          );
+
+        if(settlement){
+          result=settlement;
+        }
+      }
+
+      detectedLocation={
+        lat:Number(result.lat),
+        lng:Number(result.lon),
+        location:result.display_name ||
+          candidate,
+        locationId:isNativeInstagram
+          ? (nativeInstagramLocation.id || null)
+          : null,
+        locationSource:isNativeInstagram
+          ? 'instagram_location'
+          : 'geocoded_candidate'
+      };
+    }
 
     document.getElementById(
       'locationInput'
@@ -942,6 +1041,9 @@ async function selectLocationCandidate(index){
         ${escapeHtml(
           detectedLocation.location
         )}
+        ${detectedLocation.locationSource === 'instagram_location'
+          ? '<br><span class="muted">✓ Native Instagram location</span>'
+          : ''}
         <br>
         <span class="muted">
           ${detectedLocation.lat.toFixed(5)},
