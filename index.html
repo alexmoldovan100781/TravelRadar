@@ -21,7 +21,7 @@
     .place{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}.place:last-child{border-bottom:0}.dot{width:42px;height:42px;border-radius:12px;background:#dbeafe;display:grid;place-items:center;font-size:20px}
     nav{position:sticky;bottom:0;background:#ffffffed;backdrop-filter:blur(12px);padding:10px max(14px,env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom));display:flex;justify-content:space-around;border-top:1px solid var(--border)}
     nav button{background:transparent;color:var(--muted);padding:7px 12px}.primary{color:var(--accent)}
-    .hidden{display:none}.candidateList{display:flex;flex-direction:column;gap:8px;margin-top:10px}.candidateBtn{width:100%;text-align:left;background:#fff;color:#111827;border:1px solid var(--border);padding:11px 12px;border-radius:12px;font-weight:500}.candidateBtn.selected{background:#dbeafe;border-color:#60a5fa;color:#1d4ed8}.candidateBtn small{display:block;color:var(--muted);font-weight:400;margin-top:3px}.notifyBtn{background:#eef2ff;color:#1d4ed8;padding:7px 10px;font-size:12px}.notifyBtn.on{background:#dcfce7;color:#166534}
+    .hidden{display:none}.candidateList{display:flex;flex-direction:column;gap:8px;margin-top:10px;max-height:55vh;overflow-y:auto;padding-right:2px}.candidateBtn{width:100%;text-align:left;background:#fff;color:#111827;border:1px solid var(--border);padding:11px 12px;border-radius:12px;font-weight:500}.candidateBtn.selected{background:#dbeafe;border-color:#60a5fa;color:#1d4ed8}.candidateBtn small{display:block;color:var(--muted);font-weight:400;margin-top:3px}.notifyBtn{background:#eef2ff;color:#1d4ed8;padding:7px 10px;font-size:12px}.notifyBtn.on{background:#dcfce7;color:#166534}
     .switch{position:relative;width:52px;height:30px;display:inline-block;flex:0 0 auto}
     .switch input{opacity:0;width:0;height:0}
     .slider{position:absolute;inset:0;background:#cbd5e1;border-radius:999px;cursor:pointer;transition:.2s}
@@ -617,7 +617,7 @@ async function analyzeReelWithAI(){
     // Remove duplicates while preserving order.
     detectedCandidates=[
       ...new Set(candidates)
-    ].slice(0,8);
+    ];
 
     const caption=
       data.caption ||
