@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar 2.4.4 Instagram URL Fix</title>
+  <title>TravelRadar 2.4.5 Local JSON Backup</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f5f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--accent:#2563eb;--border:#e5e7eb}
@@ -32,7 +32,7 @@
   </style>
 </head>
 <body>
-<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">2.4.4 Instagram URL Fix</span></header>
+<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">2.4.5 Local JSON Backup</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -88,14 +88,27 @@
 
   <section class="card"><b>Map</b><div id="map"></div></section>
 
-  <section class="card"><div class="row"><div class="grow"><b>Saved places</b><div class="muted" id="count"></div></div><button class="secondary" onclick="seed()">Demo data</button></div><div id="storageRecovery" class="muted" style="display:none;margin-top:8px"></div><div id="places"></div></section>
+  <section class="card">
+  <div class="row">
+    <div class="grow"><b>Saved places</b><div class="muted" id="count"></div></div>
+    <button class="secondary" onclick="seed()">Demo data</button>
+  </div>
+  <div class="row" style="margin-top:10px;flex-wrap:wrap">
+    <button class="secondary" onclick="exportPins()">Export pins</button>
+    <button class="secondary" onclick="document.getElementById('importPinsFile').click()">Import pins</button>
+    <input id="importPinsFile" type="file" accept=".json,application/json,text/plain" class="hidden" onchange="importPinsFile(this)">
+  </div>
+  <div id="backupStatus" class="muted" style="margin-top:8px"></div>
+  <div id="storageRecovery" class="muted" style="display:none;margin-top:8px"></div>
+  <div id="places"></div>
+</section>
 </main>
 <nav><button class="primary" onclick="scrollTo(0,0)">⌖<br><small>Radar</small></button><button onclick="document.getElementById('url').focus()">＋<br><small>Add Reel</small></button><button onclick="alert('Settings will be expanded in V2.')">⚙<br><small>Settings</small></button></nav>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='2.4.4';
+const VERSION='2.4.5';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 
@@ -208,7 +221,115 @@ let lastUserPosition=null;
 let alertCircles=[];
 let notificationCooldownMs=60000;
 
+
 function save(){localStorage.setItem(KEY,JSON.stringify(places));render()}
+
+// =====================================================
+// LOCAL JSON BACKUP / RESTORE
+// V2.4.5 keeps normal operation in localStorage, but
+// provides an explicit portable text backup containing
+// ALL saved pins. Import merges pins instead of deleting
+// the current collection.
+// =====================================================
+
+function setBackupStatus(message){
+  const el=document.getElementById('backupStatus');
+  if(el) el.textContent=message || '';
+}
+
+function exportPins(){
+  try{
+    const payload={
+      app:'TravelRadar',
+      version:VERSION,
+      exportedAt:new Date().toISOString(),
+      places:places.map(p=>({...p}))
+    };
+
+    const blob=new Blob(
+      [JSON.stringify(payload,null,2)],
+      {type:'application/json;charset=utf-8'}
+    );
+
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const stamp=new Date().toISOString().slice(0,10);
+    a.href=url;
+    a.download=`TravelRadar-pins-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+
+    setBackupStatus(
+      `Backup exported: ${places.length} stored pin${places.length===1?'':'s'}.`
+    );
+  }catch(e){
+    setBackupStatus('Unable to export pins.');
+    alert('Unable to export pins.');
+  }
+}
+
+function importPinsFile(input){
+  const file=input?.files?.[0];
+  if(!file) return;
+
+  const reader=new FileReader();
+
+  reader.onload=()=>{
+    try{
+      const parsed=JSON.parse(String(reader.result||''));
+
+      let imported=[];
+      if(Array.isArray(parsed)){
+        imported=parsed;
+      }else if(parsed && Array.isArray(parsed.places)){
+        imported=parsed.places;
+      }else{
+        throw new Error('No places array found');
+      }
+
+      const normalized=imported
+        .filter(isPinLikeObject)
+        .map((p,i)=>normalizeStoredPin(p,i));
+
+      if(!normalized.length){
+        throw new Error('No valid pins found');
+      }
+
+      const before=places.length;
+      const merged=[...places];
+
+      normalized.forEach(pin=>{
+        if(!merged.some(existing=>samePin(existing,pin))){
+          merged.push(pin);
+        }
+      });
+
+      places=merged;
+      localStorage.setItem(KEY,JSON.stringify(places));
+      render();
+
+      const added=places.length-before;
+      setBackupStatus(
+        `Import complete: ${added} new pin${added===1?'':'s'} added · ${places.length} stored total.`
+      );
+    }catch(e){
+      setBackupStatus('Import failed: invalid TravelRadar JSON file.');
+      alert('Import failed. Please choose a TravelRadar pins JSON file.');
+    }finally{
+      input.value='';
+    }
+  };
+
+  reader.onerror=()=>{
+    setBackupStatus('Unable to read the selected file.');
+    input.value='';
+  };
+
+  reader.readAsText(file);
+}
+
 
 function isSupportedReelUrl(url){
   try{
