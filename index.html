@@ -95,9 +95,9 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='2.4.3';
+const VERSION='2.4.4';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
-let cat='All', user={lat:45.4642,lng:9.19}, map, markers=[];
+let cat='All', user=null, map, markers=[];
 
 // =====================================================
 // STORAGE RECOVERY / MIGRATION
@@ -601,11 +601,21 @@ function render(){
   const r=allPlaces?Infinity:Number(radiusValue);
   let shown=places.filter(p=>
     (cat==='All'||p.category===cat) &&
-    (allPlaces || distance(user.lat,user.lng,p.lat,p.lng)<=r)
+    (
+      allPlaces ||
+      (
+        user &&
+        distance(user.lat,user.lng,p.lat,p.lng)<=r
+      )
+    )
   );
   document.getElementById('count').textContent=
     shown.length+' place'+(shown.length===1?'':'s')+
-    (allPlaces ? ' · all saved places' : ' within '+r+' km');
+    (
+      allPlaces
+        ? ' · all saved places'
+        : (user ? ' within '+r+' km' : ' · location unavailable — select All')
+    );
   const recovery=document.getElementById('storageRecovery');
   if(recovery){
     const rr=window.travelRadarRecovery||{};
@@ -617,7 +627,7 @@ function render(){
     <div class="dot">📍</div>
     <div class="grow">
       <b>${escapeHtml(p.title)}</b>
-      <div class="muted">${escapeHtml(p.location)} · ${distance(user.lat,user.lng,p.lat,p.lng).toFixed(1)} km</div>
+      <div class="muted">${escapeHtml(p.location)}${user ? ' · '+distance(user.lat,user.lng,p.lat,p.lng).toFixed(1)+' km' : ''}</div>
       <div class="muted">🔔 Alert radius: ${formatRadius(Number(p.notifyRadius||2))}</div>
       <div style="margin-top:5px">
         <a href="${escapeHtml(p.url)}" target="_blank">View Reel ↗</a>
@@ -666,23 +676,36 @@ function render(){
 }
 
 function initMap(){
-  map=L.map('map').setView([user.lat,user.lng],11);
+  // No fake/default user location. The map starts neutral and is
+  // repositioned only after real GPS coordinates are available
+  // or when "All" is selected and saved pins can define the bounds.
+  map=L.map('map').setView([20,0],2);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
-  L.marker([user.lat,user.lng]).addTo(map).bindPopup('You are here');
   render();
 }
 
-navigator.geolocation?.getCurrentPosition(pos=>{
-  user={lat:pos.coords.latitude,lng:pos.coords.longitude};
-  document.getElementById('locationStatus').textContent='Location detected';
-  if(map){
-    map.setView([user.lat,user.lng],12);
+if(navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(pos=>{
+    user={lat:pos.coords.latitude,lng:pos.coords.longitude};
+    document.getElementById('locationStatus').textContent='Location detected';
+    if(map){
+      map.setView([user.lat,user.lng],12);
+      render();
+    }
+    if(notificationPermission) startGeofenceMonitoring();
+  },()=>{
+    user=null;
+    document.getElementById('locationStatus').textContent='Location unavailable';
     render();
-  }
-  if(notificationPermission) startGeofenceMonitoring();
-},()=>{
-  document.getElementById('locationStatus').textContent='Using demo location (Milan)';
-});
+  },{
+    enableHighAccuracy:true,
+    maximumAge:30000,
+    timeout:10000
+  });
+}else{
+  user=null;
+  document.getElementById('locationStatus').textContent='Location unavailable';
+}
 
 notificationPermission=false;
 document.getElementById('notifyToggle').checked=false;
