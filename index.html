@@ -35,7 +35,11 @@
 <header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">V2.1 Facebook Reels</span></header>
 <main>
   <section class="card">
-    <div class="row"><input id="url" class="input grow" placeholder="Paste Instagram or Facebook Reel URL…"><button onclick="prepareReel()">Add</button></div>
+    <div class="row">
+      <input id="url" class="input grow" placeholder="Paste Instagram or Facebook Reel URL…">
+      <button onclick="prepareReel()">Add</button>
+      <button class="secondary" onclick="clearUrl()">Clear</button>
+    </div>
     
 
     <div id="reelForm" class="hidden" style="margin-top:14px">
@@ -264,6 +268,12 @@ function saveReel(){
   alert('Saved to TravelRadar at the detected Reel location.');
 }
 
+function clearUrl(){
+  document.getElementById('url').value='';
+  clearReel();
+  document.getElementById('url').focus();
+}
+
 function clearReel(){
   pendingReel=null;
   detectedLocation=null;
@@ -272,6 +282,8 @@ function clearReel(){
   document.getElementById('reelForm').classList.add('hidden');
   document.getElementById('locationInput').value='';
   document.getElementById('saveBtn').disabled=true;
+  document.getElementById('aiResult').classList.add('hidden');
+  document.getElementById('aiResult').innerHTML='';
   if(window.pendingMarker && map){
     map.removeLayer(window.pendingMarker);
     window.pendingMarker=null;
