@@ -32,7 +32,7 @@
   </style>
 </head>
 <body>
-<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">v2.4.8 Local JSON Backup</span></header>
+<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">v2.4.9 Popup Visibility Fix</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -115,7 +115,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.4.8';
+const VERSION='v2.4.9';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 
@@ -793,11 +793,13 @@ function render(){
         `<br><br><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(Number(p.lat)+','+Number(p.lng))}" target="_blank" rel="noopener noreferrer" style="font-weight:600">📍 Open in Google Maps ↗</a>`;
       const deleteLink=`<br><button onclick="deletePlace(${p.id})" style="margin-top:10px;background:#fee2e2;color:#991b1b;padding:7px 10px;border-radius:8px;border:0;font-weight:600">🗑 Delete pin</button>`;
       const marker=L.marker([p.lat,p.lng]).addTo(map).bindPopup(
-        `<b>${escapeHtml(p.title)}</b><br>${escapeHtml(p.location)}${reelLink}${googleMapsLink}${deleteLink}`
+        `<b>${escapeHtml(p.title)}</b><br>${escapeHtml(p.location)}${reelLink}${googleMapsLink}${deleteLink}`,
+        {autoPan:true,keepInView:true,autoPanPaddingTopLeft:[30,30],autoPanPaddingBottomRight:[30,30],maxWidth:320,minWidth:240}
       );
 
       marker.on('popupopen',()=>{
         travelRadarOpenPinId=p.id;
+        setTimeout(()=>{try{map.panInside(marker.getLatLng(),{paddingTopLeft:[30,30],paddingBottomRight:[30,30],animate:true});}catch(e){}},50);
       });
 
       marker.on('popupclose',()=>{
