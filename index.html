@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.4</title>
+  <title>TravelRadar v2.5.5</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -45,7 +45,7 @@
   </style>
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.4</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.5</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -56,7 +56,7 @@
     
 
     <div id="reelForm" class="hidden" style="margin-top:14px">
-      <input id="locationInput" class="input" placeholder="Enter place or city manually…">
+      <input id="locationInput" class="input" placeholder="Enter place, city or landmark…">
       <div style="margin-top:12px">
          <div class="row" style="align-items:flex-end">
            <div class="grow">
@@ -92,7 +92,7 @@
        </div>
        <div class="row" style="margin-top:10px">
         <button onclick="analyzeReelWithAI()">📍 Detect from Reel</button>
-        <button class="secondary" onclick="detectReelLocation()">Manual location</button>
+        <button class="secondary" onclick="detectReelLocation()">📍 Search location</button>
         <button id="saveBtn" onclick="saveReel()" disabled>Save</button>
         <button class="secondary" onclick="clearReel()">Clear</button>
       </div>
@@ -149,7 +149,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.4';
+const VERSION='v2.5.5';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 
@@ -448,61 +448,152 @@ function prepareReel(){
   document.getElementById('reelForm').classList.remove('hidden');
   document.getElementById('locationInput').focus();
   document.getElementById('saveBtn').disabled=true;
-  setReelStatus('Tap 📍 Detect from Reel. If automatic detection fails, enter the location manually.','');
+  setReelStatus('Tap 📍 Detect from Reel. If automatic detection fails, search the location with Google Places.','');
 }
 
 async function detectReelLocation(){
   const query=document.getElementById('locationInput').value.trim();
-  if(!query){setReelStatus('Please enter a place or city first.','error');return}
+  if(!query){
+    setReelStatus('Please enter a place, city or landmark first.','error');
+    return;
+  }
 
   const btn=document.querySelector('#reelForm button[onclick="detectReelLocation()"]');
-  btn.disabled=true;
-  setReelStatus('Searching OpenStreetMap…','');
+  if(btn)btn.disabled=true;
+  setReelStatus('Searching Google Places…','');
 
   try{
-    const response=await fetch(
-      'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=5&addressdetails=1&q='+encodeURIComponent(query),
-      {headers:{'Accept':'application/json'}}
-    );
-    if(!response.ok) throw new Error('Geocoding request failed');
-    const results=await response.json();
+    const location=await searchLocationWithWorker(query);
 
-    if(!results.length){
-      detectedLocation=null;
-      document.getElementById('saveBtn').disabled=true;
-      setReelStatus('Location not found. Try a more specific place, city or country.','error');
-      return;
+    if(!location || !isFiniteCoordinatePair(location.latitude,location.longitude)){
+      throw new Error('Google Places could not find a usable location. Try a more specific name.');
     }
 
-    const r=results[0];
     detectedLocation={
-      lat:Number(r.lat),
-      lng:Number(r.lon),
-      location:r.display_name,
-      locationId:null,
-      locationSource:'manual',
-      mapLocation:r.display_name,
-      mapCandidate:query
+      lat:Number(location.latitude),
+      lng:Number(location.longitude),
+      location:location.name || location.display_name || query,
+      locationId:location.location_id || location.google_place_id || null,
+      locationSource:location.source || 'google_places',
+      mapLocation:location.display_name || location.name || query,
+      mapCandidate:location.geocode_name || location.name || query,
+      googleMapsUri:location.google_maps_uri || null
     };
 
-    document.getElementById('saveBtn').disabled=false;
-    setReelStatus('Detected: '+r.display_name,'detected');
+    document.getElementById('aiResult').innerHTML=
+      `<div class="status detected">
+        <b>✓ Location found</b>
+        <br><br>
+        <b>${escapeHtml(detectedLocation.location)}</b>
+        ${detectedLocation.locationId
+          ? `<br><span class="muted">✓ Google Place ID · ${escapeHtml(detectedLocation.locationId)}</span>`
+          : ''}
+        <br><br>
+        <span class="muted">
+          ✓ Coordinates supplied by TravelRadar Worker
+          <br>${detectedLocation.lat.toFixed(6)}, ${detectedLocation.lng.toFixed(6)}
+        </span>
+      </div>`;
 
-    if(map){
-      map.setView([detectedLocation.lat,detectedLocation.lng],13);
-      if(window.pendingMarker) map.removeLayer(window.pendingMarker);
-      window.pendingMarker=L.marker([detectedLocation.lat,detectedLocation.lng])
-        .addTo(map)
-        .bindPopup('<b>Reel location</b><br>'+escapeHtml(r.display_name))
-        .openPopup();
-    }
+    setReelStatus('Location found. You can save it.','detected');
+    const saveButton=document.getElementById('saveBtn');
+    if(saveButton)saveButton.disabled=false;
+    showPendingLocation(detectedLocation.location);
   }catch(e){
     detectedLocation=null;
     document.getElementById('saveBtn').disabled=true;
-    setReelStatus('Could not detect the location. Please try again.','error');
+    setReelStatus(
+      e?.message || 'Unable to find the location.',
+      'error'
+    );
+    document.getElementById('aiResult').innerHTML=
+      `<div class="status error">${escapeHtml(
+        e?.message || 'Unable to find the location.'
+      )}</div>`;
   }finally{
-    btn.disabled=false;
+    if(btn)btn.disabled=false;
   }
+}
+
+/*
+ * Manual location search is intentionally routed through the TravelRadar
+ * Worker. The browser never calls Google Places directly, so the Google
+ * API key remains server-side.
+ *
+ * The deployed Worker may expose one of the supported search route names.
+ * We try them in order and accept the first successful JSON response.
+ */
+async function searchLocationWithWorker(query){
+  const base=String(window.TRAVELRADAR_AI_PROXY||'').replace(/\/$/,'');
+  if(!base)throw new Error('TravelRadar AI proxy is not configured.');
+
+  const routes=[
+    '/place-search?query=',
+    '/places?query=',
+    '/location-search?query=',
+    '/search?query='
+  ];
+
+  let lastError=null;
+
+  for(const route of routes){
+    try{
+      const response=await fetch(
+        base+route+encodeURIComponent(query),
+        {cache:'no-store'}
+      );
+
+      if(response.status===404)continue;
+
+      let data=null;
+      try{data=await response.json();}catch(_){}
+
+      if(!response.ok || !data){
+        throw new Error(
+          data?.error || `Worker request failed (HTTP ${response.status})`
+        );
+      }
+
+      if(data.error){
+        throw new Error(data.error);
+      }
+
+      const candidates=
+        Array.isArray(data.locations) ? data.locations :
+        Array.isArray(data.results) ? data.results :
+        Array.isArray(data.places) ? data.places :
+        data.location ? [data.location] :
+        [];
+
+      const usable=candidates.find(x=>
+        isFiniteCoordinatePair(
+          x?.latitude ?? x?.lat,
+          x?.longitude ?? x?.lng ?? x?.lon
+        )
+      );
+
+      if(usable){
+        return {
+          ...usable,
+          name:usable.name || usable.display_name || query,
+          latitude:Number(usable.latitude ?? usable.lat),
+          longitude:Number(usable.longitude ?? usable.lng ?? usable.lon),
+          location_id:usable.location_id || usable.google_place_id || usable.place_id || null,
+          google_place_id:usable.google_place_id || usable.place_id || null,
+          google_maps_uri:usable.google_maps_uri || usable.google_maps_url || null
+        };
+      }
+
+      throw new Error('Google Places returned no usable coordinates.');
+    }catch(e){
+      lastError=e;
+    }
+  }
+
+  throw new Error(
+    lastError?.message ||
+    'The TravelRadar Worker does not expose a Google Places search endpoint.'
+  );
 }
 
 function setReelRadius(km){
@@ -1541,20 +1632,15 @@ async function selectLocationCandidate(index){
 
   try{
     /*
-     * V2.4:
-     * Worker 4.12 already returns authoritative coordinates.
-     * Use them directly instead of geocoding the Instagram
-     * business name again with Nominatim.
+     * Worker coordinates are authoritative. We deliberately do NOT
+     * geocode candidates in the browser. This prevents the frontend
+     * from replacing a Google Places result with an approximate POI.
      */
     const workerLocations=Array.isArray(workerMetadata?.locations)
       ? workerMetadata.locations : [];
 
     const candidateLower=String(candidate).trim().toLowerCase();
 
-    // V2.5.0: use the exact Worker location association created when
-    // candidates were consolidated. This allows a specific caption name
-    // such as "Oeschinensee Mountain Coaster!" to use the authoritative
-    // Oeschinensee coordinates without replacing the visible name.
     let workerLocation=detectedCandidateLocations[index] || null;
 
     if(!workerLocation){
@@ -1578,133 +1664,52 @@ async function selectLocationCandidate(index){
       );
     }
 
-    if(workerLocation && isFiniteCoordinatePair(workerLocation.latitude,workerLocation.longitude)){
-      const isNativeInstagram=
-        !!nativeInstagramLocation &&
-        (
-          (nativeInstagramLocation.id && workerLocation.location_id &&
-           String(nativeInstagramLocation.id)===String(workerLocation.location_id)) ||
-          candidateLower===String(nativeInstagramLocation.name||'').trim().toLowerCase()
-        );
-
-      detectedLocation={
-        lat:Number(workerLocation.latitude),
-        lng:Number(workerLocation.longitude),
-        location:isNativeInstagram
-          ? (nativeInstagramLocation.name||candidate)
-          : candidate,
-        locationId:workerLocation.location_id ||
-          (isNativeInstagram ? nativeInstagramLocation.id : null) || null,
-        locationSource:workerLocation.source ||
-          (isNativeInstagram ? 'instagram_location' : 'worker'),
-        mapLocation:workerLocation.display_name ||
-          workerLocation.name || candidate,
-        mapCandidate:workerLocation.geocode_name ||
-          workerLocation.name || candidate
-      };
-
-      document.getElementById('aiResult').innerHTML=
-        `<div class="status detected">
-          <b>✓ Location selected</b>
-          <br><br>
-          <b>${escapeHtml(detectedLocation.location)}</b>
-          ${detectedLocation.locationId
-            ? `<br><span class="muted">✓ Instagram location · ID ${escapeHtml(detectedLocation.locationId)}</span>`
-            : ''}
-          <br><br>
-          <span class="muted">
-            ✓ Coordinates supplied by TravelRadar Worker
-            <br>${detectedLocation.lat.toFixed(6)}, ${detectedLocation.lng.toFixed(6)}
-          </span>
-        </div>`;
-
-      setReelStatus('Location mapped. You can save it.','detected');
-
-      const saveButton=document.getElementById('saveBtn');
-      if(saveButton)saveButton.disabled=false;
-
-      showPendingLocation(detectedLocation.location);
-      return;
+    if(!workerLocation || !isFiniteCoordinatePair(workerLocation.latitude,workerLocation.longitude)){
+      throw new Error(
+        'The TravelRadar Worker did not return coordinates for this location.'
+      );
     }
-
-    // Fallback only when the Worker has no usable coordinates.
-    let result=null;
-    let mapCandidate=candidate;
-
-    const fallbackCandidates=[
-      candidate,
-      ...detectedCandidates.filter((_,i)=>i!==index)
-    ];
-
-    for(const candidateToMap of fallbackCandidates){
-      const query=/\b(?:del|sul)\s+Garda\b/i.test(candidateToMap)
-        ? candidateToMap+', Italy' : candidateToMap;
-
-      try{
-        const response=await fetch(
-          'https://nominatim.openstreetmap.org/search?'+
-          new URLSearchParams({
-            format:'jsonv2',
-            limit:'5',
-            addressdetails:'1',
-            'accept-language':'en',
-            q:query
-          }),
-          {headers:{'Accept':'application/json'}}
-        );
-
-        if(!response.ok)continue;
-
-        const results=await response.json();
-        if(!results.length)continue;
-
-        result=results[0];
-        mapCandidate=candidateToMap;
-
-        if(/\b(?:del|sul)\s+Garda\b/i.test(candidateToMap)){
-          const settlement=results.find(r=>
-            ['city','town','village'].includes(String(r.type||'').toLowerCase())
-          );
-          if(settlement)result=settlement;
-        }
-        break;
-      }catch(_){}
-    }
-
-    if(!result)throw new Error('The selected location could not be mapped.');
 
     const isNativeInstagram=
-      nativeInstagramLocation &&
-      candidate.toLowerCase()===nativeInstagramLocation.name.toLowerCase();
+      !!nativeInstagramLocation &&
+      (
+        (nativeInstagramLocation.id && workerLocation.location_id &&
+         String(nativeInstagramLocation.id)===String(workerLocation.location_id)) ||
+        candidateLower===String(nativeInstagramLocation.name||'').trim().toLowerCase()
+      );
 
     detectedLocation={
-      lat:Number(result.lat),
-      lng:Number(result.lon),
+      lat:Number(workerLocation.latitude),
+      lng:Number(workerLocation.longitude),
       location:isNativeInstagram
-        ? nativeInstagramLocation.name
-        : result.display_name||candidate,
-      locationId:isNativeInstagram ? (nativeInstagramLocation.id||null) : null,
-      locationSource:isNativeInstagram
-        ? 'instagram_location_fallback'
-        : 'geocoded_candidate',
-      mapLocation:result.display_name||mapCandidate,
-      mapCandidate
+        ? (nativeInstagramLocation.name||candidate)
+        : (workerLocation.name||candidate),
+      locationId:workerLocation.location_id ||
+        (isNativeInstagram ? nativeInstagramLocation.id : null) ||
+        workerLocation.google_place_id || null,
+      locationSource:workerLocation.source ||
+        (isNativeInstagram ? 'instagram_location' : 'worker'),
+      mapLocation:workerLocation.display_name ||
+        workerLocation.name || candidate,
+      mapCandidate:workerLocation.geocode_name ||
+        workerLocation.name || candidate,
+      googleMapsUri:workerLocation.google_maps_uri ||
+        workerLocation.google_maps_url || null
     };
 
     document.getElementById('aiResult').innerHTML=
       `<div class="status detected">
         <b>✓ Location selected</b>
-        <br><br><b>${escapeHtml(detectedLocation.location)}</b>
-        ${isNativeInstagram
-          ? `<br><span class="muted">✓ Native Instagram location · ID ${escapeHtml(detectedLocation.locationId||'')}</span>`
+        <br><br>
+        <b>${escapeHtml(detectedLocation.location)}</b>
+        ${detectedLocation.locationId
+          ? `<br><span class="muted">✓ Google/Instagram location ID · ${escapeHtml(detectedLocation.locationId)}</span>`
           : ''}
-        <br><br><span class="muted">
-          Location mapped successfully.
+        <br><br>
+        <span class="muted">
+          ✓ Coordinates supplied by TravelRadar Worker
           <br>${detectedLocation.lat.toFixed(6)}, ${detectedLocation.lng.toFixed(6)}
         </span>
-        ${isNativeInstagram && mapCandidate.toLowerCase()!==candidate.toLowerCase()
-          ? `<br><span class="muted">📍 Map position: ${escapeHtml(mapCandidate)}</span>`
-          : ''}
       </div>`;
 
     setReelStatus('Location mapped. You can save it.','detected');
