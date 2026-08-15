@@ -199,6 +199,7 @@ function normalizeStoredPin(p,index){
     title:p.title || (p.location ? 'Saved place' : 'Recovered pin'),
     category:p.category || 'Travel',
     url:p.url || p.reelUrl || '#',
+    thumbnailUrl:p.thumbnailUrl || p.thumbnail || null,
     platform:p.platform || null,
     lat,lng,
     location:p.location || p.name || p.display_name || 'Saved location',
@@ -939,8 +940,8 @@ function render(){
         buildThumbnailUrl(p.url) ||
         ''
       );
-      const thumbHtml=thumb!=='#'
-        ? `<img class="savedPinThumb" src="${escapeHtml(thumb)}" alt="Reel thumbnail" loading="lazy" onerror="this.outerHTML='<div class=&quot;savedPinThumbPlaceholder&quot;>📍</div>'">`
+      const thumbHtml=thumb!=='#' && safeUrl(p.url)!=='#'
+        ? `<a href="${escapeHtml(safeUrl(p.url))}" target="_blank" rel="noopener noreferrer" aria-label="Open Reel" style="display:block;flex:0 0 auto"><img class="savedPinThumb" src="${escapeHtml(thumb)}" alt="Reel thumbnail" loading="lazy" onerror="this.style.display='none'"></a>`
         : `<div class="savedPinThumbPlaceholder">📍</div>`;
       const starCount=radiusToStars(Number(p.notifyRadius||2));
       return `<div class="place">
@@ -991,8 +992,8 @@ function render(){
         buildThumbnailUrl(p.url) ||
         ''
       );
-      const popupThumbHtml=popupThumbUrl!=='#'
-        ? `<img src="${escapeHtml(popupThumbUrl)}" alt="Reel thumbnail" loading="lazy" style="display:block;width:100%;max-width:260px;height:auto;max-height:120px;object-fit:cover;border-radius:10px;margin:0 0 8px 0" onerror="this.style.display='none'">`
+      const popupThumbHtml=popupThumbUrl!=='#' && reelUrl!=='#'
+        ? `<a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Open Reel" style="display:block"><img src="${escapeHtml(popupThumbUrl)}" alt="Reel thumbnail" loading="lazy" style="display:block;width:100%;max-width:260px;height:auto;max-height:120px;object-fit:cover;border-radius:10px;margin:0 0 8px 0;cursor:pointer" onerror="this.style.display='none'"></a>`
         : '';
       const deleteLink=`<br><button onclick="deletePlace(${p.id})" style="margin-top:10px;background:#fee2e2;color:#991b1b;padding:7px 10px;border-radius:8px;border:0;font-weight:600">🗑 Delete pin</button>`;
       const popupContent =
