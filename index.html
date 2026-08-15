@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.12</title>
+  <title>TravelRadar v2.5.13</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -61,7 +61,7 @@
   </style>
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.12</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.13</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -165,9 +165,12 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.12';
+const VERSION='v2.5.13';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
+let lastRenderedShownIds='';
+let lastRenderedRadius='';
+let lastRenderedCat='';
 
 const TRAVELRADAR_GOLD_PIN_ICON=L.divIcon({
   className:'',
@@ -830,7 +833,7 @@ function onGeofencePosition(pos){
   exactLocationEnabled=true;
   const toggle=document.getElementById('exactLocationToggle');if(toggle)toggle.checked=true;
   setExactLocationStatus('Allowed · exact location on');
-  if(map)render();
+  updateUserLocationUI();
 
   const active=places.filter(p=>p.notifyEnabled);
   if(!active.length){
@@ -853,7 +856,23 @@ function onGeofencePosition(pos){
 
   localStorage.setItem(KEY,JSON.stringify(places));
   document.getElementById('locationStatus').textContent='Location detected';
-  render();
+
+  const radiusValue=document.getElementById('radius').value;
+  const r=radiusValue==='all'?Infinity:Number(radiusValue);
+  const visibleIds=places
+    .filter(p=>
+      (cat==='All'||p.category===cat) &&
+      (radiusValue==='all' || (user && distance(user.lat,user.lng,p.lat,p.lng)<=r))
+    )
+    .map(p=>String(p.id)).join(',');
+
+  // Rebuild the full UI only when the visible pin set changes. Normal GPS
+  // updates keep the existing cards, thumbnails and markers untouched.
+  if(visibleIds!==lastRenderedShownIds ||
+     radiusValue!==lastRenderedRadius ||
+     cat!==lastRenderedCat){
+    render();
+  }
 }
 
 function firePlaceNotification(p,d,radius){
@@ -920,6 +939,12 @@ function render(){
       )
     )
   );
+  const shownIds=shown.map(p=>String(p.id)).join(',');
+  const viewChanged =
+    shownIds!==lastRenderedShownIds ||
+    radiusValue!==lastRenderedRadius ||
+    cat!==lastRenderedCat;
+
   document.getElementById('count').textContent=
     shown.length+' place'+(shown.length===1?'':'s')+
     (
@@ -933,7 +958,8 @@ function render(){
     recovery.textContent=rr.recovered>0 ? ('Recovered '+rr.recovered+' older pin'+(rr.recovered===1?'':'s')+' from local storage.') : '';
     recovery.style.display=rr.recovered>0?'block':'none';
   }
-  document.getElementById('places').innerHTML=shown.length
+  if(viewChanged){
+    document.getElementById('places').innerHTML=shown.length
     ?shown.map(p=>{
       const thumb=safeUrl(
         p.thumbnailUrl ||
@@ -950,7 +976,7 @@ function render(){
       <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px">
         <div class="grow">
           <b>${escapeHtml(p.title)}</b>
-          <div class="muted">${escapeHtml(p.location)}${user ? ' · '+distance(user.lat,user.lng,p.lat,p.lng).toFixed(1)+' km' : ''}</div>
+          <div class="muted" data-place-distance="${p.id}">${escapeHtml(p.location)}${user ? ' · '+distance(user.lat,user.lng,p.lat,p.lng).toFixed(1)+' km' : ''}</div>
         </div>
         <div class="savedStars" aria-label="${starCount} stars">${'★'.repeat(starCount)}</div>
       </div>
@@ -965,8 +991,13 @@ function render(){
   </div>`;
     }).join('')
     :'<div class="muted" style="padding:15px 0">No saved places in this radius.</div>';
+  }
 
-  if(map){
+  lastRenderedShownIds=shownIds;
+  lastRenderedRadius=radiusValue;
+  lastRenderedCat=cat;
+
+  if(map && viewChanged){
     // Preserve the currently open pin popup across marker refreshes.
     const reopenPinId=travelRadarOpenPinId;
     map._travelRadarRendering=true;
@@ -1074,6 +1105,48 @@ function render(){
       window._travelRadarFitAll=false;
     }
   }
+}
+
+function updateUserLocationUI(){
+  if(!map) return;
+
+  if(user && isValidUserCoordinate(user.lat,user.lng)){
+    if(!userMarker){
+      userMarker=L.circleMarker([user.lat,user.lng],{
+        radius:9,color:'#fff',weight:3,fillColor:'#2563eb',fillOpacity:1
+      }).addTo(map).bindPopup('<b>Your exact location</b>');
+    }else{
+      userMarker.setLatLng([user.lat,user.lng]);
+    }
+
+    if(user.accuracy && Number.isFinite(Number(user.accuracy))){
+      if(!userAccuracyCircle){
+        userAccuracyCircle=L.circle([user.lat,user.lng],{
+          radius:Number(user.accuracy),color:'#2563eb',
+          fillColor:'#2563eb',fillOpacity:0.10,weight:1
+        }).addTo(map);
+      }else{
+        userAccuracyCircle.setLatLng([user.lat,user.lng]);
+        userAccuracyCircle.setRadius(Number(user.accuracy));
+      }
+    }else if(userAccuracyCircle){
+      map.removeLayer(userAccuracyCircle);
+      userAccuracyCircle=null;
+    }
+  }else{
+    if(userMarker){map.removeLayer(userMarker);userMarker=null;}
+    if(userAccuracyCircle){map.removeLayer(userAccuracyCircle);userAccuracyCircle=null;}
+  }
+
+  // Update only distance labels. Existing thumbnail <img> elements stay intact.
+  document.querySelectorAll('[data-place-distance]').forEach(el=>{
+    const id=el.getAttribute('data-place-distance');
+    const p=places.find(x=>String(x.id)===String(id));
+    if(!p) return;
+    el.textContent =
+      p.location +
+      (user ? ' · '+distance(user.lat,user.lng,p.lat,p.lng).toFixed(1)+' km' : '');
+  });
 }
 
 function initMap(){
