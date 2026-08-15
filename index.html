@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.8</title>
+  <title>TravelRadar v2.5.9</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -45,7 +45,7 @@
   </style>
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.8</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.9</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -149,7 +149,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.8';
+const VERSION='v2.5.9';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 
@@ -964,14 +964,14 @@ function render(){
         ''
       );
       const popupThumbHtml=popupThumbUrl!=='#'
-        ? `<img src="${escapeHtml(popupThumbUrl)}" alt="Reel thumbnail" loading="lazy" style="display:block;width:100%;max-width:290px;height:auto;max-height:170px;object-fit:cover;border-radius:10px;margin:0 0 10px 0" onerror="this.style.display='none'">`
+        ? `<img src="${escapeHtml(popupThumbUrl)}" alt="Reel thumbnail" loading="lazy" style="display:block;width:100%;max-width:260px;height:auto;max-height:120px;object-fit:cover;border-radius:10px;margin:0 0 8px 0" onerror="this.style.display='none'">`
         : '';
       const deleteLink=`<br><button onclick="deletePlace(${p.id})" style="margin-top:10px;background:#fee2e2;color:#991b1b;padding:7px 10px;border-radius:8px;border:0;font-weight:600">🗑 Delete pin</button>`;
       const popupContent =
         `${popupThumbHtml}<b>${escapeHtml(p.title)}</b><br>${escapeHtml(p.location)}${reelLink}${googleMapsLink}${deleteLink}`;
       const marker=L.marker([p.lat,p.lng]).addTo(map).bindPopup(
         popupContent,
-        {autoPan:true,keepInView:true,autoPanPaddingTopLeft:[30,30],autoPanPaddingBottomRight:[30,30],maxWidth:320,minWidth:240}
+        {autoPan:true,keepInView:true,autoPanPaddingTopLeft:[16,16],autoPanPaddingBottomRight:[16,16],maxWidth:Math.min(300,Math.max(220,window.innerWidth-32)),minWidth:0,maxHeight:Math.max(180,window.innerHeight-120),className:'travelRadarPopup'}
       );
 
       marker.on('popupopen',()=>{
