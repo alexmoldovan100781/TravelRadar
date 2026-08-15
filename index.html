@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.13</title>
+  <title>TravelRadar v2.5.14</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -61,7 +61,7 @@
   </style>
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.13</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.14</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -165,7 +165,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.13';
+const VERSION='v2.5.14';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -1313,12 +1313,12 @@ async function analyzeReelWithAI(){
       '';
 
     /*
-     * V2.2:
-     * Prefer a native Instagram location returned by Worker 4.8.
-     * This is stronger than a location inferred from caption text.
-     *
-     * If the Worker has a native location, keep its name + ID and
-     * use its candidate as the first selectable location.
+     * V2.5.14:
+     * Prefer the Worker's resolved POI when it explicitly selected a
+     * concrete candidate (e.g. "Bar Il Molo, Varenna"). A native
+     * Instagram location such as "Varenna" is useful context, but it
+     * should not outrank a more precise Google Places POI returned by
+     * the Worker.
      */
     const nativeName =
       data.platform === 'Instagram' &&
@@ -1339,9 +1339,22 @@ async function analyzeReelWithAI(){
       };
     }
 
-    const orderedCandidates = nativeName
-      ? [nativeName, ...candidates]
-      : candidates;
+    const workerSelectedCandidate=cleanCandidateText(
+      data?.resolution?.selected_candidate ||
+      data?.matched_candidate ||
+      ''
+    );
+
+    // V2.5.14: Worker-selected precise POI wins over the generic native
+    // Instagram location. Keep the native location and other clues as
+    // fallback choices, but do not force the generic city/town to the top.
+    const orderedCandidates=[
+      ...(workerSelectedCandidate ? [workerSelectedCandidate] : []),
+      ...(nativeName ? [nativeName] : []),
+      ...candidates
+    ].filter((candidate,index,array)=>
+      array.findIndex(x=>x.toLowerCase()===candidate.toLowerCase())===index
+    );
 
     // V2.5.0:
     // Consolidate caption candidates that resolve to the same Worker
@@ -1662,6 +1675,11 @@ function renderLocationCandidates(
 
   const nativeName =
     nativeInstagramLocation?.name || '';
+  const workerSelectedCandidate=cleanCandidateText(
+    data?.resolution?.selected_candidate ||
+    data?.matched_candidate ||
+    ''
+  );
 
   const list=candidates.map(
     (candidate,index)=>{
@@ -1669,6 +1687,10 @@ function renderLocationCandidates(
         nativeName &&
         candidate.toLowerCase() ===
           nativeName.toLowerCase();
+      const isWorkerSelected =
+        workerSelectedCandidate &&
+        candidate.toLowerCase() ===
+          workerSelectedCandidate.toLowerCase();
 
       return `
         <button
@@ -1678,24 +1700,22 @@ function renderLocationCandidates(
           onclick="selectLocationCandidate(${index})"
         >
           📍 ${escapeHtml(candidate)}
-          ${isNative
-            ? '<small>✓ Instagram location — verified location attached to the Reel.</small>'
-            : index===0
-              ? '<small>Suggested first — you choose whether to use it.</small>'
-              : ''}
+          ${isWorkerSelected
+            ? '<small>✓ Worker-selected precise place — Google Places match.</small>'
+            : isNative
+              ? '<small>✓ Instagram location — verified location attached to the Reel.</small>'
+              : index===0
+                ? '<small>Suggested first — you choose whether to use it.</small>'
+                : ''}
         </button>
       `;
     }
   ).join('');
 
   const workerBest=
-    data?.matched_candidate
+    workerSelectedCandidate
       ? `<br><span class="muted">
-           Worker suggestion: ${escapeHtml(
-             cleanCandidateText(
-               data.matched_candidate
-             )
-           )}
+           Worker selected: ${escapeHtml(workerSelectedCandidate)}
          </span>`
       : '';
 
