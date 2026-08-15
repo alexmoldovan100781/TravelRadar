@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.4.7 Exact Location</title>
+  <title>TravelRadar v2.5.0 Exact Location</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f5f7fb;--card:#fff;--text:#111827;--muted:#6b7280;--accent:#2563eb;--border:#e5e7eb}
@@ -32,7 +32,7 @@
   </style>
 </head>
 <body>
-<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">v2.4.9 Popup Visibility Fix</span></header>
+<header><div><h1>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">v2.5.0 Location Dedup Fix</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -115,7 +115,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.4.9';
+const VERSION='v2.5.0';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 
@@ -219,6 +219,7 @@ let places=loadPlaces();
 let pendingReel=null;
 let detectedLocation=null;
 let detectedCandidates=[];
+let detectedCandidateLocations=[];
 let selectedCandidateIndex=-1;
 let nativeInstagramLocation=null;
 let workerMetadata=null;
@@ -406,6 +407,7 @@ function prepareReel(){
   pendingReel={url};
   detectedLocation=null;
   detectedCandidates=[];
+  detectedCandidateLocations=[];
   selectedCandidateIndex=-1;
   nativeInstagramLocation=null;
   document.getElementById('reelNotifyRadius').value='2';
@@ -535,6 +537,7 @@ function clearReel(){
   pendingReel=null;
   detectedLocation=null;
   detectedCandidates=[];
+  detectedCandidateLocations=[];
   selectedCandidateIndex=-1;
   nativeInstagramLocation=null;
   document.getElementById('reelForm').classList.add('hidden');
@@ -954,6 +957,7 @@ async function analyzeReelWithAI(){
   pendingReel={url};
   detectedLocation=null;
   detectedCandidates=[];
+  detectedCandidateLocations=[];
   selectedCandidateIndex=-1;
   nativeInstagramLocation=null;
 
@@ -1044,12 +1048,17 @@ async function analyzeReelWithAI(){
       ? [nativeName, ...candidates]
       : candidates;
 
-    // Remove duplicates while preserving order.
-    detectedCandidates=[
-      ...new Set(
-        orderedCandidates.filter(Boolean)
-      )
-    ];
+    // V2.5.0:
+    // Consolidate caption candidates that resolve to the same Worker
+    // location. The most specific candidate name is kept while the
+    // authoritative Worker coordinates are retained.
+    const consolidated=consolidateLocationCandidates(
+      orderedCandidates,
+      data
+    );
+
+    detectedCandidates=consolidated.candidates;
+    detectedCandidateLocations=consolidated.workerLocations;
 
     // No candidates at all.
     if(!detectedCandidates.length){
@@ -1126,6 +1135,194 @@ async function analyzeReelWithAI(){
       'locationInput'
     ).focus();
   }
+}
+
+
+// =====================================================
+// V2.5.0 LOCATION CANDIDATE CONSOLIDATION
+// =====================================================
+//
+// A Reel caption can contain several names for the same physical
+// place. Example:
+//   "Oeschinensee Mountain Coaster!"
+//   "Oeschinesee"
+//
+// The Worker may correctly resolve both clues to the lake coordinates.
+// TravelRadar should therefore show ONE selectable location, keeping
+// the more informative caption name while using the Worker coordinates.
+//
+// The matching is deliberately conservative:
+// 1. exact name / geocode-name match
+// 2. one normalized name contains the other
+// 3. the candidate contains the Worker geocode name as a meaningful
+//    token sequence (e.g. "Oeschinensee Mountain Coaster")
+//
+// If there is no Worker association, the candidate remains untouched.
+
+function normalizeLocationMatchText(value){
+  return String(value||'')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
+function locationCoordinateKey(location){
+  if(!location || !isFiniteCoordinatePair(location.latitude,location.longitude)) return '';
+  return `${Number(location.latitude).toFixed(4)}:${Number(location.longitude).toFixed(4)}`;
+}
+
+function candidateMatchesWorkerLocation(candidate, location){
+  if(!location) return false;
+
+  const c=normalizeLocationMatchText(candidate);
+  if(!c) return false;
+
+  const names=[
+    location.name,
+    location.geocode_name,
+    location.display_name
+  ]
+    .map(normalizeLocationMatchText)
+    .filter(Boolean);
+
+  if(!names.length) return false;
+
+  for(const n of names){
+    if(!n) continue;
+    if(c===n || c.includes(n) || n.includes(c)) return true;
+
+    // Compare meaningful token sequences for names such as:
+    // "Oeschinensee Mountain Coaster" vs "Oeschinensee".
+    const tokens=n.split(' ').filter(x=>x.length>=4);
+    if(tokens.length){
+      const matched=tokens.filter(token=>c.split(' ').includes(token));
+      if(matched.length>=Math.min(2,tokens.length)) return true;
+      if(tokens.length===1 && c.split(' ').includes(tokens[0])) return true;
+    }
+  }
+
+  return false;
+}
+
+function candidateSpecificityScore(candidate, workerLocation){
+  const c=normalizeLocationMatchText(candidate);
+  if(!c) return -Infinity;
+
+  let score=c.length;
+  const workerNames=[
+    workerLocation?.name,
+    workerLocation?.geocode_name
+  ].map(normalizeLocationMatchText).filter(Boolean);
+
+  // Prefer a descriptive landmark/business name over the bare place name.
+  for(const n of workerNames){
+    if(c===n) score-=1000;
+    else if(c.includes(n)) score+=80;
+  }
+
+  // More words generally means a more useful Reel-specific label.
+  score+=c.split(' ').filter(Boolean).length*15;
+  return score;
+}
+
+function consolidateLocationCandidates(candidates,data){
+  const workerLocations=Array.isArray(data?.locations)
+    ? data.locations.filter(loc=>isFiniteCoordinatePair(loc?.latitude,loc?.longitude))
+    : [];
+
+  const uniqueCandidates=[...new Set((candidates||[]).filter(Boolean))];
+  const groups=[];
+  const used=new Set();
+
+  // First consolidate candidates that can be tied to the same Worker
+  // location (including different Worker records sharing coordinates).
+  for(let i=0;i<uniqueCandidates.length;i++){
+    if(used.has(i)) continue;
+
+    const candidate=uniqueCandidates[i];
+    const matches=[];
+
+    for(let w=0;w<workerLocations.length;w++){
+      if(candidateMatchesWorkerLocation(candidate,workerLocations[w])){
+        matches.push(w);
+      }
+    }
+
+    if(!matches.length){
+      groups.push({candidate,workerLocation:null,order:i});
+      used.add(i);
+      continue;
+    }
+
+    const coordinateKeys=new Set(
+      matches.map(w=>locationCoordinateKey(workerLocations[w])).filter(Boolean)
+    );
+
+    const groupIndices=[];
+    for(let j=i;j<uniqueCandidates.length;j++){
+      if(used.has(j)) continue;
+
+      const candidateMatches=workerLocations.some((loc,w)=>{
+        if(!candidateMatchesWorkerLocation(uniqueCandidates[j],loc)) return false;
+        return coordinateKeys.has(locationCoordinateKey(loc));
+      });
+
+      if(candidateMatches){
+        groupIndices.push(j);
+        used.add(j);
+      }
+    }
+
+    let bestIndex=groupIndices[0];
+    let bestScore=-Infinity;
+    for(const idx of groupIndices){
+      const score=Math.max(...matches.map(w=>candidateSpecificityScore(uniqueCandidates[idx],workerLocations[w])));
+      if(score>bestScore){
+        bestScore=score;
+        bestIndex=idx;
+      }
+    }
+
+    const bestCandidate=uniqueCandidates[bestIndex];
+    const representative=workerLocations[matches[0]];
+
+    groups.push({
+      candidate:bestCandidate,
+      workerLocation:representative,
+      order:i
+    });
+  }
+
+  // If two groups ended up pointing at the same coordinates, merge them
+  // and again keep the most informative candidate name.
+  const merged=[];
+  for(const group of groups){
+    const key=locationCoordinateKey(group.workerLocation);
+    if(!key){
+      merged.push(group);
+      continue;
+    }
+
+    const existing=merged.find(x=>locationCoordinateKey(x.workerLocation)===key);
+    if(!existing){
+      merged.push(group);
+      continue;
+    }
+
+    const aScore=candidateSpecificityScore(existing.candidate,existing.workerLocation);
+    const bScore=candidateSpecificityScore(group.candidate,group.workerLocation);
+    if(bScore>aScore) existing.candidate=group.candidate;
+  }
+
+  merged.sort((a,b)=>a.order-b.order);
+
+  return {
+    candidates:merged.map(x=>x.candidate),
+    workerLocations:merged.map(x=>x.workerLocation)
+  };
 }
 
 
@@ -1270,11 +1467,19 @@ async function selectLocationCandidate(index){
 
     const candidateLower=String(candidate).trim().toLowerCase();
 
-    let workerLocation=workerLocations.find(loc=>{
-      const name=String(loc?.name||'').trim().toLowerCase();
-      const geocode=String(loc?.geocode_name||'').trim().toLowerCase();
-      return name===candidateLower || geocode===candidateLower;
-    });
+    // V2.5.0: use the exact Worker location association created when
+    // candidates were consolidated. This allows a specific caption name
+    // such as "Oeschinensee Mountain Coaster!" to use the authoritative
+    // Oeschinensee coordinates without replacing the visible name.
+    let workerLocation=detectedCandidateLocations[index] || null;
+
+    if(!workerLocation){
+      workerLocation=workerLocations.find(loc=>{
+        const name=String(loc?.name||'').trim().toLowerCase();
+        const geocode=String(loc?.geocode_name||'').trim().toLowerCase();
+        return name===candidateLower || geocode===candidateLower;
+      });
+    }
 
     if(!workerLocation && nativeInstagramLocation?.id){
       workerLocation=workerLocations.find(loc=>
@@ -1302,8 +1507,8 @@ async function selectLocationCandidate(index){
         lat:Number(workerLocation.latitude),
         lng:Number(workerLocation.longitude),
         location:isNativeInstagram
-          ? (nativeInstagramLocation.name||workerLocation.name||candidate)
-          : (workerLocation.name||candidate),
+          ? (nativeInstagramLocation.name||candidate)
+          : candidate,
         locationId:workerLocation.location_id ||
           (isNativeInstagram ? nativeInstagramLocation.id : null) || null,
         locationSource:workerLocation.source ||
