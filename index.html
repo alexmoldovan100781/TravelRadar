@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.11</title>
+  <title>TravelRadar v2.5.12</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -61,7 +61,7 @@
   </style>
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.11</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.12</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -165,7 +165,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.11';
+const VERSION='v2.5.12';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 
@@ -977,8 +977,12 @@ function render(){
     shown.forEach(p=>{
       const reelUrl=safeUrl(p.url);
       const alertRadius=Number(p.notifyRadius||2);
+      const thumbnailUrl=safeUrl(p.thumbnailUrl || p.thumbnail || '');
+      const thumbnailHtml = reelUrl!=='#' && thumbnailUrl!=='#'
+        ? `<a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Open Reel"><img src="${escapeHtml(thumbnailUrl)}" alt="Reel thumbnail" style="display:block;width:100%;max-width:280px;height:auto;max-height:180px;object-fit:cover;border-radius:10px;margin:0 0 10px;cursor:pointer" onerror="this.style.display='none'"></a>`
+        : '';
       const reelLink=reelUrl!=='#'
-        ? `<br><br><a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" style="font-weight:600">🔗 View Reel ↗</a>`
+        ? `<br><a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" style="font-weight:600">🔗 Open Reel ↗</a>`
         : '';
       const googleMapsLink =
         `<br><br><a href="${escapeHtml(p.googleMapsUri || ('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(Number(p.lat)+','+Number(p.lng))))}" target="_blank" rel="noopener noreferrer" style="font-weight:600">📍 Open in Google Maps ↗</a>`;
