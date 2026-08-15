@@ -933,6 +933,7 @@ function render(){
       <div class="muted">🔔 ${formatRadius(Number(p.notifyRadius||2))} alert radius</div>
       <div style="margin-top:5px">
         <a href="${escapeHtml(p.url)}" target="_blank">View Reel ↗</a>
+        <a href="${escapeHtml(p.googleMapsUri || ('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(Number(p.lat)+','+Number(p.lng))))}" target="_blank" rel="noopener noreferrer" style="margin-left:10px">📍 Open in Google Maps ↗</a>
         ${p.url && p.url !== '#' ? `<button class="notifyBtn ${p.notifyEnabled?'on':''}" onclick="toggleNotification(${p.id})">${p.notifyEnabled?'🔔 On':'🔔 Notify'}</button>` : ''}
         <button class="notifyBtn" onclick="deletePlace(${p.id})" style="background:#fee2e2;color:#991b1b">🗑 Delete</button>
       </div>
@@ -957,10 +958,20 @@ function render(){
         ? `<br><br><a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" style="font-weight:600">🔗 View Reel ↗</a>`
         : '';
       const googleMapsLink =
-        `<br><br><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(Number(p.lat)+','+Number(p.lng))}" target="_blank" rel="noopener noreferrer" style="font-weight:600">📍 Open in Google Maps ↗</a>`;
+        `<br><br><a href="${escapeHtml(p.googleMapsUri || ('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(Number(p.lat)+','+Number(p.lng))))}" target="_blank" rel="noopener noreferrer" style="font-weight:600">📍 Open in Google Maps ↗</a>`;
+      const popupThumbUrl=safeUrl(
+        p.thumbnailUrl ||
+        buildThumbnailUrl(p.url) ||
+        ''
+      );
+      const popupThumbHtml=popupThumbUrl!=='#'
+        ? `<img src="${escapeHtml(popupThumbUrl)}" alt="Reel thumbnail" loading="lazy" style="display:block;width:100%;max-width:290px;height:auto;max-height:170px;object-fit:cover;border-radius:10px;margin:0 0 10px 0" onerror="this.style.display='none'">`
+        : '';
       const deleteLink=`<br><button onclick="deletePlace(${p.id})" style="margin-top:10px;background:#fee2e2;color:#991b1b;padding:7px 10px;border-radius:8px;border:0;font-weight:600">🗑 Delete pin</button>`;
+      const popupContent =
+        `${popupThumbHtml}<b>${escapeHtml(p.title)}</b><br>${escapeHtml(p.location)}${reelLink}${googleMapsLink}${deleteLink}`;
       const marker=L.marker([p.lat,p.lng]).addTo(map).bindPopup(
-        `<b>${escapeHtml(p.title)}</b><br>${escapeHtml(p.location)}${reelLink}${googleMapsLink}${deleteLink}`,
+        popupContent,
         {autoPan:true,keepInView:true,autoPanPaddingTopLeft:[30,30],autoPanPaddingBottomRight:[30,30],maxWidth:320,minWidth:240}
       );
 
