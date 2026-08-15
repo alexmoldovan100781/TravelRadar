@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.2</title>
+  <title>TravelRadar v2.5.3</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -29,24 +29,23 @@
     .switch input:checked+.slider{background:#22c55e}
     .switch input:checked+.slider:before{transform:translateX(22px)}
     .status{margin-top:8px;padding:10px;border-radius:10px;background:#f8fafc}.detected{background:#ecfdf5;color:#166534}.error{background:#fef2f2;color:#991b1b}
-    .starProgress{position:relative;display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-top:14px;padding:0 2px 2px}
-    .starTrack{position:absolute;left:10%;right:10%;top:67px;height:4px;border-radius:999px;background:linear-gradient(90deg,#fbbf24,#f59e0b,#fb7185,#a855f7);z-index:0}
-    .starChoice{position:relative;z-index:1;background:transparent!important;box-shadow:none!important;color:var(--text);padding:0 2px 4px;border:0;border-radius:14px;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;transition:transform .16s,filter .16s}
+    .starProgress{position:relative;display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-top:18px;padding:0 2px 2px}
+    .starTrack{position:absolute;left:10%;right:10%;top:67px;height:5px;border-radius:999px;background:linear-gradient(90deg,#fbbf24 0%,#f59e0b 25%,#fb7185 55%,#d946ef 78%,#7c3aed 100%);z-index:0;box-shadow:0 1px 4px #f59e0b35}
+    .starChoice{position:relative;z-index:1;background:transparent!important;box-shadow:none!important;color:var(--text);padding:0 2px 4px;border:0;border-radius:14px;display:flex;flex-direction:column;align-items:center;gap:7px;min-width:0;transition:transform .16s,filter .16s}
     .starChoice:hover{transform:translateY(-2px)}
     .moodEmoji{font-size:39px;line-height:1;display:grid;place-items:center;width:54px;height:54px;background:#fff;border:2px solid #fbbf24;border-radius:50%;box-shadow:0 3px 12px #f59e0b20}
-    .moodDistance{font-size:12px;font-weight:700;color:var(--muted);white-space:nowrap}
+    .moodDistance{font-size:13px;font-weight:800;color:var(--text);white-space:nowrap}
     .starChoice.selected .moodEmoji{border-color:#2563eb;box-shadow:0 0 0 3px #2563eb18,0 5px 18px #2563eb25;transform:scale(1.08)}
     .starChoice.selected .moodDistance{color:#2563eb}
-    .radiusPill{background:#e0f2fe;color:#075985;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:700}
     .savedStars{color:#f6b817;font-size:16px;letter-spacing:1px;white-space:nowrap;text-shadow:0 0 5px #f6b81780,0 0 9px #f6b81730}
     .savedPinThumb{width:74px;height:74px;border-radius:14px;object-fit:cover;flex:0 0 74px;background:#eaf4ff;border:1px solid #dbe4f0;box-shadow:0 4px 12px #07142612}
     .savedPinThumbPlaceholder{width:74px;height:74px;border-radius:14px;display:grid;place-items:center;flex:0 0 74px;background:linear-gradient(145deg,#dbeafe,#eff6ff);font-size:30px}
-    @media(max-width:520px){.moodEmoji{font-size:33px;width:48px;height:48px}.moodDistance{font-size:12px}.starTrack{top:61px;left:9%;right:9%}.savedPinThumb,.savedPinThumbPlaceholder{width:64px;height:64px;flex-basis:64px}}
+    @media(max-width:520px){.moodEmoji{font-size:33px;width:48px;height:48px}.moodDistance{font-size:12px}.starTrack{top:57px;left:9%;right:9%}.savedPinThumb,.savedPinThumbPlaceholder{width:64px;height:64px;flex-basis:64px}}
 
   </style>
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.2</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.3</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -61,10 +60,9 @@
       <div style="margin-top:12px">
          <div class="row" style="align-items:flex-end">
            <div class="grow">
-             <label class="muted"><b>How badly do you want to see this?</b></label>
-             <div id="reelStarHint" class="muted" style="margin-top:3px">3 stars · 2 km alert radius</div>
+             <label style="font-size:17px;line-height:1.25"><b>✨ How badly do you want to see this? ✨</b></label>
+             <div id="reelStarHint" class="muted" style="margin-top:5px">Slide to choose how badly you want to see this.</div>
            </div>
-           <span id="reelRadiusValue" class="radiusPill">2 km</span>
          </div>
          <div id="reelStarPicker" class="starProgress" role="radiogroup" aria-label="How badly do you want to see this?">
            <div class="starTrack" aria-hidden="true"></div>
@@ -151,7 +149,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.2';
+const VERSION='v2.5.3';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 
@@ -518,10 +516,8 @@ function setReelRadius(km){
     b.classList.toggle('selected',i===stars-1);
     b.setAttribute('aria-checked',i===stars-1?'true':'false');
   });
-  const pill=document.getElementById('reelRadiusValue');
-  if(pill) pill.textContent=formatRadius(Number(km));
   const hint=document.getElementById('reelStarHint');
-  if(hint) hint.textContent=`${stars} ${stars===1?'star':'stars'} · ${formatRadius(Number(km))} alert radius`;
+  if(hint) hint.textContent='Slide to choose how badly you want to see this.';
 }
 
 function selectReelStar(stars){
