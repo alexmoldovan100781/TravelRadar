@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.1</title>
+  <title>TravelRadar v2.5.2</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -29,16 +29,25 @@
     .switch input:checked+.slider{background:#22c55e}
     .switch input:checked+.slider:before{transform:translateX(22px)}
     .status{margin-top:8px;padding:10px;border-radius:10px;background:#f8fafc}.detected{background:#ecfdf5;color:#166534}.error{background:#fef2f2;color:#991b1b}
-    .starPicker{display:flex;gap:5px;margin-top:7px;padding:4px 0}
-    .starBtn{background:transparent!important;box-shadow:none!important;color:#cbd5e1;font-size:32px;line-height:1;padding:3px 5px;border:0;transition:transform .15s,color .15s}
-    .starBtn:hover{transform:scale(1.12)}
-    .starBtn.selected,.starBtn.filled{color:#f59e0b}
+    .starProgress{position:relative;display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-top:14px;padding:0 2px 2px}
+    .starTrack{position:absolute;left:10%;right:10%;top:67px;height:4px;border-radius:999px;background:linear-gradient(90deg,#fbbf24,#f59e0b,#fb7185,#a855f7);z-index:0}
+    .starChoice{position:relative;z-index:1;background:transparent!important;box-shadow:none!important;color:var(--text);padding:0 2px 4px;border:0;border-radius:14px;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;transition:transform .16s,filter .16s}
+    .starChoice:hover{transform:translateY(-2px)}
+    .moodEmoji{font-size:39px;line-height:1;display:grid;place-items:center;width:54px;height:54px;background:#fff;border:2px solid #fbbf24;border-radius:50%;box-shadow:0 3px 12px #f59e0b20}
+    .moodStars{font-size:19px;line-height:1;color:#f59e0b;letter-spacing:1px;white-space:nowrap;text-shadow:0 0 5px #f59e0b55}
+    .moodDistance{font-size:13px;font-weight:800;color:var(--text);white-space:nowrap}
+    .starChoice.selected .moodEmoji{border-color:#2563eb;box-shadow:0 0 0 3px #2563eb18,0 5px 18px #2563eb25;transform:scale(1.08)}
+    .starChoice.selected .moodDistance{color:#2563eb}
     .radiusPill{background:#e0f2fe;color:#075985;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:700}
+    .savedStars{color:#f6b817;font-size:16px;letter-spacing:1px;white-space:nowrap;text-shadow:0 0 5px #f6b81780,0 0 9px #f6b81730}
+    .savedPinThumb{width:74px;height:74px;border-radius:14px;object-fit:cover;flex:0 0 74px;background:#eaf4ff;border:1px solid #dbe4f0;box-shadow:0 4px 12px #07142612}
+    .savedPinThumbPlaceholder{width:74px;height:74px;border-radius:14px;display:grid;place-items:center;flex:0 0 74px;background:linear-gradient(145deg,#dbeafe,#eff6ff);font-size:30px}
+    @media(max-width:520px){.moodEmoji{font-size:33px;width:48px;height:48px}.moodStars{font-size:15px;letter-spacing:0}.moodDistance{font-size:12px}.starTrack{top:61px;left:9%;right:9%}.savedPinThumb,.savedPinThumbPlaceholder{width:64px;height:64px;flex-basis:64px}}
 
   </style>
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving</div></div><span class="badge">v2.5.1</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.2</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -58,12 +67,23 @@
            </div>
            <span id="reelRadiusValue" class="radiusPill">2 km</span>
          </div>
-         <div id="reelStarPicker" class="starPicker" role="radiogroup" aria-label="How badly do you want to see this?">
-           <button type="button" class="starBtn" data-radius="0.5" aria-label="1 star — 500 m" onclick="selectReelStar(1)">★</button>
-           <button type="button" class="starBtn" data-radius="1" aria-label="2 stars — 1 km" onclick="selectReelStar(2)">★</button>
-           <button type="button" class="starBtn selected" data-radius="2" aria-label="3 stars — 2 km" onclick="selectReelStar(3)">★</button>
-           <button type="button" class="starBtn" data-radius="5" aria-label="4 stars — 5 km" onclick="selectReelStar(4)">★</button>
-           <button type="button" class="starBtn" data-radius="10" aria-label="5 stars — 10 km" onclick="selectReelStar(5)">★</button>
+         <div id="reelStarPicker" class="starProgress" role="radiogroup" aria-label="How badly do you want to see this?">
+           <div class="starTrack" aria-hidden="true"></div>
+           <button type="button" class="starChoice" data-radius="0.5" aria-label="1 star — 500 m" onclick="selectReelStar(1)">
+             <span class="moodEmoji">😐</span><span class="moodStars">★</span><span class="moodDistance">500 m</span>
+           </button>
+           <button type="button" class="starChoice" data-radius="1" aria-label="2 stars — 1 km" onclick="selectReelStar(2)">
+             <span class="moodEmoji">🙂</span><span class="moodStars">★★</span><span class="moodDistance">1 km</span>
+           </button>
+           <button type="button" class="starChoice selected" data-radius="2" aria-label="3 stars — 2 km" onclick="selectReelStar(3)">
+             <span class="moodEmoji">😃</span><span class="moodStars">★★★</span><span class="moodDistance">2 km</span>
+           </button>
+           <button type="button" class="starChoice" data-radius="5" aria-label="4 stars — 5 km" onclick="selectReelStar(4)">
+             <span class="moodEmoji">😍</span><span class="moodStars">★★★★</span><span class="moodDistance">5 km</span>
+           </button>
+           <button type="button" class="starChoice" data-radius="10" aria-label="5 stars — 10 km" onclick="selectReelStar(5)">
+             <span class="moodEmoji">🤩</span><span class="moodStars">★★★★★</span><span class="moodDistance">10 km</span>
+           </button>
          </div>
          <select id="reelNotifyRadius" class="hidden">
            <option value="0.5">500 m</option>
@@ -132,7 +152,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.1';
+const VERSION='v2.5.2';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 
@@ -491,13 +511,12 @@ async function detectReelLocation(){
 function setReelRadius(km){
   const select=document.getElementById('reelNotifyRadius');
   if(select) select.value=String(km);
-  const buttons=[...document.querySelectorAll('#reelStarPicker .starBtn')];
+  const buttons=[...document.querySelectorAll('#reelStarPicker .starChoice')];
   const radii=[0.5,1,2,5,10];
   const idx=radii.findIndex(v=>Number(v)===Number(km));
   const stars=idx>=0 ? idx+1 : 3;
   buttons.forEach((b,i)=>{
-    b.classList.toggle('selected',i<stars);
-    b.classList.toggle('filled',i<stars);
+    b.classList.toggle('selected',i===stars-1);
     b.setAttribute('aria-checked',i===stars-1?'true':'false');
   });
   const pill=document.getElementById('reelRadiusValue');
@@ -532,6 +551,12 @@ function starsLabel(km){
   return '★'.repeat(n)+'☆'.repeat(5-n);
 }
 
+function buildThumbnailUrl(reelUrl){
+  if(!reelUrl || !window.TRAVELRADAR_AI_PROXY) return null;
+  return window.TRAVELRADAR_AI_PROXY.replace(/\/$/,'')+
+    '/thumbnail?url='+encodeURIComponent(reelUrl);
+}
+
 function saveReel(){
   if(!pendingReel || !detectedLocation){
     alert('Detect the Reel location before saving.');
@@ -547,6 +572,7 @@ function saveReel(){
     category:'Travel',
     url:pendingReel.url,
     platform:getReelPlatform(pendingReel.url),
+     thumbnailUrl:buildThumbnailUrl(pendingReel.url),
     lat:detectedLocation.lat,
     lng:detectedLocation.lng,
     location:detectedLocation.location,
@@ -798,19 +824,31 @@ function render(){
     recovery.style.display=rr.recovered>0?'block':'none';
   }
   document.getElementById('places').innerHTML=shown.length
-    ?shown.map(p=>`<div class="place">
-    <div class="dot">📍</div>
+    ?shown.map(p=>{
+      const thumb=safeUrl(p.thumbnailUrl||'');
+      const thumbHtml=thumb!=='#'
+        ? `<img class="savedPinThumb" src="${escapeHtml(thumb)}" alt="Reel thumbnail" loading="lazy" onerror="this.style.display='none'">`
+        : `<div class="savedPinThumbPlaceholder">📍</div>`;
+      const starCount=radiusToStars(Number(p.notifyRadius||2));
+      return `<div class="place">
+    ${thumbHtml}
     <div class="grow">
-      <b>${escapeHtml(p.title)}</b>
-      <div class="muted">${escapeHtml(p.location)}${user ? ' · '+distance(user.lat,user.lng,p.lat,p.lng).toFixed(1)+' km' : ''}</div>
-      <div class="muted">🔔 ${starsLabel(Number(p.notifyRadius||2))} · ${formatRadius(Number(p.notifyRadius||2))}</div>
+      <div class="row" style="justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="grow">
+          <b>${escapeHtml(p.title)}</b>
+          <div class="muted">${escapeHtml(p.location)}${user ? ' · '+distance(user.lat,user.lng,p.lat,p.lng).toFixed(1)+' km' : ''}</div>
+        </div>
+        <div class="savedStars" aria-label="${starCount} stars">${'★'.repeat(starCount)}</div>
+      </div>
+      <div class="muted">🔔 ${formatRadius(Number(p.notifyRadius||2))} alert radius</div>
       <div style="margin-top:5px">
         <a href="${escapeHtml(p.url)}" target="_blank">View Reel ↗</a>
         ${p.url && p.url !== '#' ? `<button class="notifyBtn ${p.notifyEnabled?'on':''}" onclick="toggleNotification(${p.id})">${p.notifyEnabled?'🔔 On':'🔔 Notify'}</button>` : ''}
         <button class="notifyBtn" onclick="deletePlace(${p.id})" style="background:#fee2e2;color:#991b1b">🗑 Delete</button>
       </div>
     </div>
-  </div>`).join('')
+  </div>`;
+    }).join('')
     :'<div class="muted" style="padding:15px 0">No saved places in this radius.</div>';
 
   if(map){
