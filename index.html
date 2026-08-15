@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.14</title>
+  <title>TravelRadar v2.5.15</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -61,7 +61,7 @@
   </style>
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.14</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.15</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -165,7 +165,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.14';
+const VERSION='v2.5.15';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -1542,97 +1542,146 @@ function consolidateLocationCandidates(candidates,data){
     : [];
 
   const uniqueCandidates=[...new Set((candidates||[]).filter(Boolean))];
+  const selectedText=normalizeLocationMatchText(
+    data?.resolution?.selected_candidate || data?.matched_candidate || ''
+  );
+
+  function isPrecisePoi(loc){
+    if(!loc)return false;
+    const source=String(loc.source||'').toLowerCase();
+    const type=String(loc.type||'').toLowerCase();
+    return source.includes('google_places') ||
+      !!loc.google_place_id ||
+      !!loc.google_maps_uri ||
+      !!loc.google_maps_url ||
+      (type && !['administrative','locality','city','town','village','municipality','county','region'].includes(type));
+  }
+
+  function locationNames(loc){
+    return [loc?.name,loc?.geocode_name,loc?.display_name]
+      .map(normalizeLocationMatchText).filter(Boolean);
+  }
+
+  function selectedScore(loc){
+    if(!loc)return -Infinity;
+    let score=isPrecisePoi(loc)?500:0;
+    if(loc.google_place_id)score+=100;
+    locationNames(loc).forEach(n=>{
+      if(selectedText && n===selectedText)score+=1000;
+      else if(selectedText && (selectedText.includes(n)||n.includes(selectedText)))score+=250;
+    });
+    return score;
+  }
+
   const groups=[];
-  const used=new Set();
 
-  // First consolidate candidates that can be tied to the same Worker
-  // location (including different Worker records sharing coordinates).
-  for(let i=0;i<uniqueCandidates.length;i++){
-    if(used.has(i)) continue;
-
-    const candidate=uniqueCandidates[i];
+  uniqueCandidates.forEach((candidate,index)=>{
+    const c=normalizeLocationMatchText(candidate);
     const matches=[];
 
-    for(let w=0;w<workerLocations.length;w++){
-      if(candidateMatchesWorkerLocation(candidate,workerLocations[w])){
+    workerLocations.forEach((loc,w)=>{
+      const precise=isPrecisePoi(loc);
+      const names=locationNames(loc);
+
+      if(names.some(n=>{
+        if(c===n)return true;
+        // A precise POI may match "Bar Il Molo, Varenna" through
+        // its specific business name. A generic municipality may not
+        // absorb a more specific POI.
+        if(precise)return c.includes(n);
+        return n.includes(c);
+      })){
         matches.push(w);
       }
-    }
+    });
 
     if(!matches.length){
-      groups.push({candidate,workerLocation:null,order:i});
-      used.add(i);
-      continue;
-    }
-
-    const coordinateKeys=new Set(
-      matches.map(w=>locationCoordinateKey(workerLocations[w])).filter(Boolean)
-    );
-
-    const groupIndices=[];
-    for(let j=i;j<uniqueCandidates.length;j++){
-      if(used.has(j)) continue;
-
-      const candidateMatches=workerLocations.some((loc,w)=>{
-        if(!candidateMatchesWorkerLocation(uniqueCandidates[j],loc)) return false;
-        return coordinateKeys.has(locationCoordinateKey(loc));
+      groups.push({
+        candidate,
+        workerLocation:null,
+        order:index,
+        selected:c===selectedText
       });
-
-      if(candidateMatches){
-        groupIndices.push(j);
-        used.add(j);
-      }
+      return;
     }
 
-    let bestIndex=groupIndices[0];
-    let bestScore=-Infinity;
-    for(const idx of groupIndices){
-      const score=Math.max(...matches.map(w=>candidateSpecificityScore(uniqueCandidates[idx],workerLocations[w])));
+    let bestW=matches[0], bestScore=-Infinity;
+    matches.forEach(w=>{
+      const score=selectedScore(workerLocations[w]);
       if(score>bestScore){
         bestScore=score;
-        bestIndex=idx;
+        bestW=w;
       }
-    }
-
-    const bestCandidate=uniqueCandidates[bestIndex];
-    const representative=workerLocations[matches[0]];
+    });
 
     groups.push({
-      candidate:bestCandidate,
-      workerLocation:representative,
-      order:i
+      candidate,
+      workerLocation:workerLocations[bestW],
+      order:index,
+      selected:c===selectedText
+    });
+  });
+
+  // Guarantee that the Worker's explicitly selected precise POI exists
+  // as its own candidate, even when a generic Instagram locality also
+  // matches part of its name.
+  if(selectedText){
+    workerLocations.forEach(loc=>{
+      if(!isPrecisePoi(loc))return;
+
+      const names=locationNames(loc);
+      if(!names.some(n=>selectedText===n || selectedText.includes(n)))return;
+
+      const key=locationCoordinateKey(loc);
+      const exists=groups.some(g=>
+        g.workerLocation &&
+        locationCoordinateKey(g.workerLocation)===key
+      );
+
+      if(!exists){
+        groups.unshift({
+          candidate:data?.resolution?.selected_candidate || loc.name,
+          workerLocation:loc,
+          order:-1,
+          selected:true
+        });
+      }
     });
   }
 
-  // If two groups ended up pointing at the same coordinates, merge them
-  // and again keep the most informative candidate name.
-  const merged=[];
-  for(const group of groups){
-    const key=locationCoordinateKey(group.workerLocation);
-    if(!key){
-      merged.push(group);
-      continue;
-    }
+  // Only remove exact duplicate candidates or duplicate precise POIs.
+  // Never merge a POI into its municipality merely because both contain
+  // the municipality name (e.g. Bar Il Molo / Varenna).
+  const deduped=[];
+  groups.forEach(group=>{
+    const duplicate=deduped.some(existing=>{
+      const sameCandidate=
+        normalizeLocationMatchText(existing.candidate)===
+        normalizeLocationMatchText(group.candidate);
 
-    const existing=merged.find(x=>locationCoordinateKey(x.workerLocation)===key);
-    if(!existing){
-      merged.push(group);
-      continue;
-    }
+      const samePrecisePoi=
+        isPrecisePoi(existing.workerLocation) &&
+        isPrecisePoi(group.workerLocation) &&
+        locationCoordinateKey(existing.workerLocation) &&
+        locationCoordinateKey(existing.workerLocation)===
+        locationCoordinateKey(group.workerLocation);
 
-    const aScore=candidateSpecificityScore(existing.candidate,existing.workerLocation);
-    const bScore=candidateSpecificityScore(group.candidate,group.workerLocation);
-    if(bScore>aScore) existing.candidate=group.candidate;
-  }
+      return sameCandidate || samePrecisePoi;
+    });
 
-  merged.sort((a,b)=>a.order-b.order);
+    if(!duplicate)deduped.push(group);
+  });
+
+  deduped.sort((a,b)=>{
+    if(a.selected!==b.selected)return a.selected?-1:1;
+    return a.order-b.order;
+  });
 
   return {
-    candidates:merged.map(x=>x.candidate),
-    workerLocations:merged.map(x=>x.workerLocation)
+    candidates:deduped.map(x=>x.candidate),
+    workerLocations:deduped.map(x=>x.workerLocation)
   };
 }
-
 
 function cleanCandidateText(value){
 
