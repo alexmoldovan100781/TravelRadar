@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.22</title>
+  <title>TravelRadar v2.5.23</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -76,7 +76,7 @@
   </style>
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.22</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.23</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -180,7 +180,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.22';
+const VERSION='v2.5.23';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -1162,16 +1162,29 @@ function render(){
   }
 
   if(map && window._travelRadarFitMap){
+    // Recalculate the Leaflet viewport before fitting. On iPhone the map
+    // container can still be settling when the first render occurs.
+    map.invalidateSize(true);
+
     if(allPlaces && shown.length){
-      // Worldwide: fit ALL currently visible saved pins.
       const validPoints=shown
         .filter(p=>isValidUserCoordinate(p.lat,p.lng))
         .map(p=>[Number(p.lat),Number(p.lng)]);
-      if(validPoints.length>1){
-        map.fitBounds(L.latLngBounds(validPoints),{padding:[30,30],maxZoom:13,animate:false});
-      }else if(validPoints.length===1){
-        map.setView(validPoints[0],13,{animate:false});
-      }
+
+      const applyWorldwideFit=()=>{
+        if(!map || !validPoints.length) return;
+        map.invalidateSize(true);
+        if(validPoints.length>1){
+          const bounds=L.latLngBounds(validPoints);
+          map.fitBounds(bounds,{padding:[45,45],maxZoom:12,animate:false});
+        }else{
+          map.setView(validPoints[0],12,{animate:false});
+        }
+      };
+
+      // Fit now and once again after the mobile layout has settled.
+      applyWorldwideFit();
+      setTimeout(applyWorldwideFit,200);
     }else if(!allPlaces){
       // Nearby: fit the selected-radius result plus the user's position.
       const points=shown
@@ -1181,8 +1194,9 @@ function render(){
         points.push([Number(user.lat),Number(user.lng)]);
       }
 
+      map.invalidateSize(true);
       if(points.length>1){
-        map.fitBounds(L.latLngBounds(points),{padding:[30,30],maxZoom:15,animate:false});
+        map.fitBounds(L.latLngBounds(points),{padding:[45,45],maxZoom:15,animate:false});
       }else if(points.length===1){
         map.setView(points[0],15,{animate:false});
       }else if(user && isValidUserCoordinate(user.lat,user.lng)){
@@ -1304,7 +1318,7 @@ function toggleExactLocation(enabled){
   if(map)render();
 }
 
-// v2.5.22: notifications are controlled only by the global app switch.
+// v2.5.23: notifications are controlled only by the global app switch.
 // Every saved pin uses its configured alert radius when global notifications are ON.
 notificationsEnabled = localStorage.getItem('travelRadarNotificationsEnabled') !== '0';
 notificationPermission = ('Notification' in window && Notification.permission === 'granted');
