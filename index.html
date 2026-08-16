@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.27</title>
+  <title>TravelRadar v2.5.28</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -66,6 +66,24 @@
       box-shadow:0 3px 9px rgba(120,80,0,.38);
       display:flex;align-items:center;justify-content:center;
     }
+    .savedDescription{
+      margin-top:8px;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.45;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+    #savedSearch{
+      padding-right:14px;
+      background:#f8fafc;
+    }
+    #savedSearch:focus{
+      outline:none;
+      border-color:#93c5fd;
+      box-shadow:0 0 0 3px #2563eb18;
+      background:#fff;
+    }
     .travelRadarGoldPin span{
       transform:rotate(45deg);
       color:#fff8d6;
@@ -103,7 +121,7 @@ button{
 <style>.nearby-card{padding-top:18px;padding-bottom:18px}.nearby-card .row{min-height:62px}</style>
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.27</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.28</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -115,6 +133,13 @@ button{
 
     <div id="reelForm" class="hidden" style="margin-top:14px">
       <input id="locationInput" class="input" placeholder="Enter place, city or landmark…">
+      <div style="margin-top:12px">
+        <label for="shortDescription" style="display:block;font-size:14px;font-weight:700;margin-bottom:6px">Short description</label>
+        <textarea id="shortDescription" class="input" rows="4" maxlength="2000"
+          placeholder="Add a short description for this saved place…"
+          style="resize:vertical;min-height:92px;line-height:1.45"></textarea>
+        <div class="muted" style="margin-top:5px">Pre-filled with the Reel caption. You can edit it before saving.</div>
+      </div>
       <div style="margin-top:12px">
          <div class="row" style="align-items:flex-end">
            <div class="grow">
@@ -187,7 +212,13 @@ button{
   <section class="card">
   <div class="row">
     <div class="grow"><b>Saved places</b><div class="muted" id="count"></div></div>
-    <button class="secondary" onclick="seed()">Demo data</button>
+  </div>
+  <div style="margin-top:10px">
+    <input id="savedSearch" class="input" type="search"
+      placeholder="Search saved places by description…"
+      aria-label="Search saved places by description"
+      autocomplete="off"
+      oninput="window._travelRadarSavedSearch=this.value;render()">
   </div>
   <div class="row" style="margin-top:10px;flex-wrap:wrap">
     <button class="secondary" onclick="exportPins()">Export pins</button>
@@ -204,7 +235,7 @@ button{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.27';
+const VERSION='v2.5.28';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -249,7 +280,8 @@ function normalizeStoredPin(p,index){
     locationSource:p.locationSource ?? p.source ?? null,
     notifyEnabled:typeof p.notifyEnabled==='boolean' ? p.notifyEnabled : false,
     notifyRadius:Number.isFinite(Number(p.notifyRadius)) ? Number(p.notifyRadius) : 2,
-    insideGeofence:!!p.insideGeofence
+    insideGeofence:!!p.insideGeofence,
+    description:String(p.description ?? p.shortDescription ?? p.caption ?? '').trim()
   };
 }
 
@@ -317,6 +349,7 @@ function loadPlaces(){
 }
 
 let places=loadPlaces();
+window._travelRadarSavedSearch='';
 let pendingReel=null;
 let detectedLocation=null;
 let detectedCandidates=[];
@@ -337,6 +370,8 @@ let notificationCooldownMs=60000;
 let travelRadarOpenPinId=null;
 let travelRadarFocusHighlight=null;
 let travelRadarFocusTimer=null;
+let travelRadarSavedSearch='';
+let lastRenderedSearch='';
 
 
 function save(){localStorage.setItem(KEY,JSON.stringify(places));render()}
@@ -510,6 +545,9 @@ function prepareReel(){
     return;
   }
   pendingReel={url};
+  workerMetadata=null;
+  const descriptionField=document.getElementById('shortDescription');
+  if(descriptionField)descriptionField.value='';
   detectedLocation=null;
   detectedCandidates=[];
   detectedCandidateLocations=[];
@@ -713,7 +751,45 @@ function buildThumbnailUrl(reelUrl){
     '/thumbnail?url='+encodeURIComponent(reelUrl);
 }
 
-function saveReel(){
+function normalizeSearchText(value){
+  return String(value||'')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^\p{L}\p{N}\s]+/gu,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
+function matchesSavedSearch(pin,query){
+  const normalizedQuery=normalizeSearchText(query);
+  if(!normalizedQuery)return true;
+  const description=normalizeSearchText(pin?.description||'');
+  if(!description)return false;
+
+  // All entered keywords must occur in the saved description.
+  return normalizedQuery.split(' ').filter(Boolean)
+    .every(keyword=>description.includes(keyword));
+}
+
+async function fetchReelCaption(url){
+  if(!url || !window.TRAVELRADAR_AI_PROXY)return '';
+  try{
+    const response=await fetch(
+      window.TRAVELRADAR_AI_PROXY+
+      '/metadata?url='+encodeURIComponent(url),
+      {cache:'no-store'}
+    );
+    if(!response.ok)return '';
+    const data=await response.json();
+    if(data?.error)return '';
+    return String(data?.caption||data?.og_description||'').trim();
+  }catch(_){
+    return '';
+  }
+}
+
+async function saveReel(){
   if(!pendingReel || !detectedLocation){
     alert('Detect the Reel location before saving.');
     return;
@@ -722,20 +798,45 @@ function saveReel(){
   const notifyRadius=getSelectedReelRadius();
   if(notifyRadius===null)return;
 
+  const descriptionInput=document.getElementById('shortDescription');
+  let description=String(descriptionInput?.value||'').trim();
+
+  if(!description){
+    description=String(workerMetadata?.caption||'').trim();
+  }
+
+  // Manual-location saves may not have loaded metadata yet.
+  if(!description && pendingReel.url){
+    const saveButton=document.getElementById('saveBtn');
+    if(saveButton){
+      saveButton.disabled=true;
+      saveButton.textContent='Saving…';
+    }
+    try{
+      description=await fetchReelCaption(pendingReel.url);
+    }finally{
+      if(saveButton){
+        saveButton.disabled=false;
+        saveButton.textContent='Save';
+      }
+    }
+  }
+
   places.unshift({
     id:Date.now(),
     title:'Saved from '+getReelPlatform(pendingReel.url)+' Reel',
     category:'Travel',
     url:pendingReel.url,
     platform:getReelPlatform(pendingReel.url),
-     thumbnailUrl:buildThumbnailUrl(pendingReel.url),
+    thumbnailUrl:buildThumbnailUrl(pendingReel.url),
     lat:detectedLocation.lat,
     lng:detectedLocation.lng,
     location:detectedLocation.location,
-    locationId:detectedLocation.locationId || null,
-    locationSource:detectedLocation.locationSource || null,
+    locationId:detectedLocation.locationId||null,
+    locationSource:detectedLocation.locationSource||null,
     notifyRadius:notifyRadius,
-    insideGeofence:false
+    insideGeofence:false,
+    description:description
   });
 
   document.getElementById('url').value='';
@@ -743,7 +844,6 @@ function saveReel(){
   save();
   alert('Saved to TravelRadar at the detected Reel location.');
 }
-
 function clearUrl(){
   document.getElementById('url').value='';
   clearReel();
@@ -759,6 +859,9 @@ function clearReel(){
   nativeInstagramLocation=null;
   document.getElementById('reelForm').classList.add('hidden');
   document.getElementById('locationInput').value='';
+  const descriptionField=document.getElementById('shortDescription');
+  if(descriptionField)descriptionField.value='';
+  workerMetadata=null;
   document.getElementById('saveBtn').disabled=true;
   document.getElementById('aiResult').classList.add('hidden');
   document.getElementById('aiResult').innerHTML='';
@@ -1001,6 +1104,10 @@ function render(){
   const radiusValue=document.getElementById('radius').value;
   const allPlaces=radiusValue==='all';
   const r=allPlaces?Infinity:Number(radiusValue);
+  const savedSearch=String(window._travelRadarSavedSearch ?? travelRadarSavedSearch ?? '');
+  travelRadarSavedSearch=savedSearch;
+  const normalizedSearch=normalizeSearchText(savedSearch);
+
   let shown=places.filter(p=>
     (cat==='All'||p.category===cat) &&
     (
@@ -1009,21 +1116,27 @@ function render(){
         user &&
         distance(user.lat,user.lng,p.lat,p.lng)<=r
       )
-    )
+    ) &&
+    matchesSavedSearch(p,normalizedSearch)
   );
   const shownIds=shown.map(p=>String(p.id)).join(',');
   const viewChanged =
     shownIds!==lastRenderedShownIds ||
     radiusValue!==lastRenderedRadius ||
-    cat!==lastRenderedCat;
+    cat!==lastRenderedCat ||
+    normalizedSearch!==lastRenderedSearch;
 
-  document.getElementById('count').textContent=
+  const baseCount=
     shown.length+' place'+(shown.length===1?'':'s')+
     (
       allPlaces
         ? ' · all saved places'
         : (user ? ' within '+r+' km' : ' · location unavailable — select All')
     );
+  document.getElementById('count').textContent=
+    normalizedSearch
+      ? baseCount+' · matching “'+savedSearch.trim()+'”'
+      : baseCount;
   const recovery=document.getElementById('storageRecovery');
   if(recovery){
     const rr=window.travelRadarRecovery||{};
@@ -1073,6 +1186,7 @@ function render(){
   lastRenderedShownIds=shownIds;
   lastRenderedRadius=radiusValue;
   lastRenderedCat=cat;
+  lastRenderedSearch=normalizedSearch;
 
   if(map && viewChanged){
     // Preserve the currently open pin popup across marker refreshes.
@@ -1303,6 +1417,9 @@ function updateUserLocationUI(){
 }
 
 function initMap(){
+  const searchField=document.getElementById('savedSearch');
+  if(searchField)searchField.value=travelRadarSavedSearch||'';
+
   // No fake/default user location. The map starts neutral and is
   // repositioned only after real GPS coordinates are available
   // or when "All" is selected and saved pins can define the bounds.
@@ -1381,7 +1498,7 @@ function toggleExactLocation(enabled){
   if(map)render();
 }
 
-// v2.5.27: notifications are controlled only by the global app switch.
+// v2.5.28: notifications are controlled only by the global app switch.
 // Every saved pin uses its configured alert radius when global notifications are ON.
 notificationsEnabled = localStorage.getItem('travelRadarNotificationsEnabled') !== '0';
 notificationPermission = ('Notification' in window && Notification.permission === 'granted');
@@ -1418,6 +1535,9 @@ async function analyzeReelWithAI(){
   }
 
   pendingReel={url};
+  workerMetadata=null;
+  const descriptionField=document.getElementById('shortDescription');
+  if(descriptionField)descriptionField.value='';
   detectedLocation=null;
   detectedCandidates=[];
   detectedCandidateLocations=[];
@@ -1479,6 +1599,11 @@ async function analyzeReelWithAI(){
       data.caption ||
       data.og_description ||
       '';
+
+    const descriptionField=document.getElementById('shortDescription');
+    if(descriptionField && caption){
+      descriptionField.value=caption;
+    }
 
     /*
      * V2.5.17:
