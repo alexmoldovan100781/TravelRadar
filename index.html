@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.21</title>
+  <title>TravelRadar v2.5.22</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -76,7 +76,7 @@
   </style>
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.21</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.22</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -180,7 +180,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.21';
+const VERSION='v2.5.22';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -1153,41 +1153,45 @@ function render(){
       if(userAccuracyCircle){map.removeLayer(userAccuracyCircle);userAccuracyCircle=null;}
     }
 
-    // Auto-fit the map only after the user explicitly changes the
-    // Nearby radius (or selects Worldwide). This mirrors the Worldwide
-    // behavior while making the selected Nearby area fully visible.
-    // Do NOT fit on every render(): GPS/geofence updates can happen after
-    // the user manually zooms and should never take control of the map.
-    if(window._travelRadarFitMap){
-      if(allPlaces && shown.length){
-        // Worldwide: fit all currently visible saved pins.
-        const bounds=L.latLngBounds(shown.map(p=>[p.lat,p.lng]));
-        map.fitBounds(bounds,{padding:[30,30],maxZoom:13});
-      }else if(!allPlaces){
-        // Nearby: fit the selected-radius result, including the user's
-        // current position so the whole nearby area remains visible.
-        const points=shown.map(p=>[Number(p.lat),Number(p.lng)]);
-        if(user && isValidUserCoordinate(user.lat,user.lng)){
-          points.push([Number(user.lat),Number(user.lng)]);
-        }
+    // Auto-fit is deliberately handled independently from viewChanged.
+    // A GPS update can call render() without changing the visible pin list;
+    // if the initial Worldwide fit was not possible yet, we still need to
+    // perform it once the map has a real location / rendered state.
+    // After the fit is consumed, normal GPS updates never take control of
+    // the user's manual map zoom.
+  }
 
-        if(points.length>1){
-          const bounds=L.latLngBounds(points);
-          map.fitBounds(bounds,{padding:[30,30],maxZoom:15});
-        }else if(points.length===1){
-          // With a single pin and no usable user position, keep it centered
-          // without zooming excessively close.
-          map.setView(points[0],15);
-        }else if(user && isValidUserCoordinate(user.lat,user.lng)){
-          // No saved pins in the selected radius: still show the selected
-          // Nearby area around the user's real position.
-          const fallbackZoom={0.5:15,2:13,5:11,10:10,25:9,50:8};
-          const z=fallbackZoom[String(radiusValue)] || 10;
-          map.setView([Number(user.lat),Number(user.lng)],z);
-        }
+  if(map && window._travelRadarFitMap){
+    if(allPlaces && shown.length){
+      // Worldwide: fit ALL currently visible saved pins.
+      const validPoints=shown
+        .filter(p=>isValidUserCoordinate(p.lat,p.lng))
+        .map(p=>[Number(p.lat),Number(p.lng)]);
+      if(validPoints.length>1){
+        map.fitBounds(L.latLngBounds(validPoints),{padding:[30,30],maxZoom:13,animate:false});
+      }else if(validPoints.length===1){
+        map.setView(validPoints[0],13,{animate:false});
       }
-      window._travelRadarFitMap=false;
+    }else if(!allPlaces){
+      // Nearby: fit the selected-radius result plus the user's position.
+      const points=shown
+        .filter(p=>isValidUserCoordinate(p.lat,p.lng))
+        .map(p=>[Number(p.lat),Number(p.lng)]);
+      if(user && isValidUserCoordinate(user.lat,user.lng)){
+        points.push([Number(user.lat),Number(user.lng)]);
+      }
+
+      if(points.length>1){
+        map.fitBounds(L.latLngBounds(points),{padding:[30,30],maxZoom:15,animate:false});
+      }else if(points.length===1){
+        map.setView(points[0],15,{animate:false});
+      }else if(user && isValidUserCoordinate(user.lat,user.lng)){
+        const fallbackZoom={0.5:15,2:13,5:11,10:10,25:9,50:8};
+        const z=fallbackZoom[String(radiusValue)] || 10;
+        map.setView([Number(user.lat),Number(user.lng)],z,{animate:false});
+      }
     }
+    window._travelRadarFitMap=false;
   }
 }
 
@@ -1300,7 +1304,7 @@ function toggleExactLocation(enabled){
   if(map)render();
 }
 
-// v2.5.21: notifications are controlled only by the global app switch.
+// v2.5.22: notifications are controlled only by the global app switch.
 // Every saved pin uses its configured alert radius when global notifications are ON.
 notificationsEnabled = localStorage.getItem('travelRadarNotificationsEnabled') !== '0';
 notificationPermission = ('Notification' in window && Notification.permission === 'granted');
