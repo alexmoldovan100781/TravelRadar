@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.16</title>
+  <title>TravelRadar v2.5.17</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -42,6 +42,10 @@
     .savedPinThumbPlaceholder{width:74px;height:74px;border-radius:14px;display:grid;place-items:center;flex:0 0 74px;background:linear-gradient(145deg,#dbeafe,#eff6ff);font-size:30px}
     @media(max-width:520px){.moodEmoji{font-size:33px;width:48px;height:48px}.moodDistance{font-size:12px}.starTrack{top:82px;left:9%;right:9%}.savedPinThumb,.savedPinThumbPlaceholder{width:64px;height:64px;flex-basis:64px}}
 
+    .showMapBtn{background:#e0f2fe;color:#0369a1;box-shadow:none;padding:7px 10px;font-size:12px}
+    .travelRadarFocusPulse{animation:travelRadarFocusPulse 1s ease-out 2;transform-origin:center}
+    @keyframes travelRadarFocusPulse{0%{opacity:.85}100%{opacity:0}}
+
     .travelRadarGoldPin{
       width:34px;height:34px;
       background:linear-gradient(145deg,#ffd76a,#d99a00);
@@ -61,7 +65,7 @@
   </style>
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.16</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.17</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -165,7 +169,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.16';
+const VERSION='v2.5.17';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -294,6 +298,8 @@ let exactLocationEnabled=false;
 let alertCircles=[];
 let notificationCooldownMs=60000;
 let travelRadarOpenPinId=null;
+let travelRadarFocusHighlight=null;
+let travelRadarFocusTimer=null;
 
 
 function save(){localStorage.setItem(KEY,JSON.stringify(places));render()}
@@ -925,6 +931,55 @@ function deletePlace(id){
   save();
 }
 
+function clearTravelRadarFocusHighlight(){
+  if(travelRadarFocusTimer){
+    clearTimeout(travelRadarFocusTimer);
+    travelRadarFocusTimer=null;
+  }
+  if(travelRadarFocusHighlight && map){
+    try{map.removeLayer(travelRadarFocusHighlight);}catch(e){}
+  }
+  travelRadarFocusHighlight=null;
+}
+
+function showPlaceOnMap(id){
+  const p=places.find(x=>String(x.id)===String(id));
+  if(!p || !map)return;
+
+  const marker=markers.find(m=>String(m._travelRadarPinId)===String(id));
+  if(!marker){
+    // The button is normally available only for pins currently rendered.
+    // If the marker was temporarily removed by a refresh, rebuild the map
+    // view and try once more after the current render cycle.
+    render();
+    const retry=markers.find(m=>String(m._travelRadarPinId)===String(id));
+    if(!retry)return;
+    return showPlaceOnMap(id);
+  }
+
+  clearTravelRadarFocusHighlight();
+
+  map.flyTo([Number(p.lat),Number(p.lng)],Math.max(map.getZoom()||0,15),{duration:0.7});
+
+  travelRadarFocusHighlight=L.circle([Number(p.lat),Number(p.lng)],{
+    radius:140,
+    color:'#0ea5e9',
+    fillColor:'#38bdf8',
+    fillOpacity:0.14,
+    weight:4,
+    className:'travelRadarFocusPulse',
+    interactive:false
+  }).addTo(map);
+
+  travelRadarFocusTimer=setTimeout(()=>{
+    clearTravelRadarFocusHighlight();
+  },2200);
+
+  setTimeout(()=>{
+    try{marker.openPopup();}catch(e){}
+  },450);
+}
+
 function render(){
   const radiusValue=document.getElementById('radius').value;
   const allPlaces=radiusValue==='all';
@@ -983,6 +1038,7 @@ function render(){
       <div class="muted">🔔 ${formatRadius(Number(p.notifyRadius||2))} alert radius</div>
       <div style="margin-top:5px">
         <a href="${escapeHtml(p.url)}" target="_blank">View Reel ↗</a>
+        <button class="showMapBtn" onclick="showPlaceOnMap(${p.id})">🗺 Show on map</button>
         <a href="${escapeHtml(p.googleMapsUri || ('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(Number(p.lat)+','+Number(p.lng))))}" target="_blank" rel="noopener noreferrer" style="margin-left:10px">📍 Open in Google Maps ↗</a>
         ${p.url && p.url !== '#' ? `<button class="notifyBtn ${p.notifyEnabled?'on':''}" onclick="toggleNotification(${p.id})">${p.notifyEnabled?'🔔 On':'🔔 Notify'}</button>` : ''}
         <button class="notifyBtn" onclick="deletePlace(${p.id})" style="background:#fee2e2;color:#991b1b">🗑 Delete</button>
@@ -1034,6 +1090,7 @@ function render(){
         popupContent,
         {autoPan:true,keepInView:true,autoPanPaddingTopLeft:[16,16],autoPanPaddingBottomRight:[16,16],maxWidth:Math.min(300,Math.max(220,window.innerWidth-32)),minWidth:0,maxHeight:Math.max(180,window.innerHeight-120),className:'travelRadarPopup'}
       );
+      marker._travelRadarPinId=p.id;
 
       marker.on('popupopen',()=>{
         travelRadarOpenPinId=p.id;
@@ -1238,7 +1295,7 @@ function toggleExactLocation(enabled){
   if(map)render();
 }
 
-// v2.5.1: Location Notifications are ON by default.
+// v2.5.17: Location Notifications are ON by default.
 // Browser notification permission remains controlled by iOS/browser.
 notificationPermission = ('Notification' in window && Notification.permission === 'granted');
 const notifyToggle = document.getElementById('notifyToggle');
@@ -1335,7 +1392,7 @@ async function analyzeReelWithAI(){
       '';
 
     /*
-     * V2.5.14:
+     * V2.5.17:
      * Prefer the Worker's resolved POI when it explicitly selected a
      * concrete candidate (e.g. "Bar Il Molo, Varenna"). A native
      * Instagram location such as "Varenna" is useful context, but it
@@ -1367,7 +1424,7 @@ async function analyzeReelWithAI(){
       ''
     );
 
-    // V2.5.14: Worker-selected precise POI wins over the generic native
+    // V2.5.17: Worker-selected precise POI wins over the generic native
     // Instagram location. Keep the native location and other clues as
     // fallback choices, but do not force the generic city/town to the top.
     const orderedCandidates=[
@@ -1378,7 +1435,7 @@ async function analyzeReelWithAI(){
       array.findIndex(x=>x.toLowerCase()===candidate.toLowerCase())===index
     );
 
-    // V2.5.0:
+    // V2.5.17:
     // Consolidate caption candidates that resolve to the same Worker
     // location. The most specific candidate name is kept while the
     // authoritative Worker coordinates are retained.
@@ -1469,7 +1526,7 @@ async function analyzeReelWithAI(){
 
 
 // =====================================================
-// V2.5.0 LOCATION CANDIDATE CONSOLIDATION
+// V2.5.17 LOCATION CANDIDATE CONSOLIDATION
 // =====================================================
 //
 // A Reel caption can contain several names for the same physical
