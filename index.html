@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.17</title>
+  <title>TravelRadar v2.5.18</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -42,7 +42,18 @@
     .savedPinThumbPlaceholder{width:74px;height:74px;border-radius:14px;display:grid;place-items:center;flex:0 0 74px;background:linear-gradient(145deg,#dbeafe,#eff6ff);font-size:30px}
     @media(max-width:520px){.moodEmoji{font-size:33px;width:48px;height:48px}.moodDistance{font-size:12px}.starTrack{top:82px;left:9%;right:9%}.savedPinThumb,.savedPinThumbPlaceholder{width:64px;height:64px;flex-basis:64px}}
 
-    .showMapBtn{background:#e0f2fe;color:#0369a1;box-shadow:none;padding:7px 10px;font-size:12px}
+    .pinActions{display:flex;flex-direction:column;gap:7px;margin-top:9px;width:100%}
+    .pinAction{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:40px;padding:9px 12px;border:1px solid var(--border);border-radius:12px;background:#f8fafc;color:var(--text);text-decoration:none;font-size:13px;font-weight:650;line-height:1.2;box-shadow:none;cursor:pointer}
+    .pinAction:hover{background:#f1f5f9}
+    .pinAction .pinActionLeft{display:flex;align-items:center;gap:8px}
+    .pinAction .pinActionChevron{font-size:18px;color:#94a3b8;line-height:1}
+    .pinAction.map{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
+    .pinAction.show{background:#e0f2fe;border-color:#bae6fd;color:#0369a1}
+    .pinAction.notify{background:#eef2ff;border-color:#c7d2fe;color:#3730a3}
+    .pinAction.notify.on{background:#ecfdf5;border-color:#bbf7d0;color:#166534}
+    .pinAction.delete{background:#fef2f2;border-color:#fecaca;color:#b91c1c}
+    .pinAction.delete:hover{background:#fee2e2}
+    .pinActionsPopup{display:flex;flex-direction:column;gap:7px;margin-top:10px}
     .travelRadarFocusPulse{animation:travelRadarFocusPulse 1s ease-out 2;transform-origin:center}
     @keyframes travelRadarFocusPulse{0%{opacity:.85}100%{opacity:0}}
 
@@ -65,7 +76,7 @@
   </style>
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.17</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.18</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -169,7 +180,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.17';
+const VERSION='v2.5.18';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -1036,12 +1047,17 @@ function render(){
         <div class="savedStars" aria-label="${starCount} stars">${'★'.repeat(starCount)}</div>
       </div>
       <div class="muted">🔔 ${formatRadius(Number(p.notifyRadius||2))} alert radius</div>
-      <div style="margin-top:5px">
-        <a href="${escapeHtml(p.url)}" target="_blank">View Reel ↗</a>
-        <button class="showMapBtn" onclick="showPlaceOnMap(${p.id})">🗺 Show on map</button>
-        <a href="${escapeHtml(p.googleMapsUri || ('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(Number(p.lat)+','+Number(p.lng))))}" target="_blank" rel="noopener noreferrer" style="margin-left:10px">📍 Open in Google Maps ↗</a>
-        ${p.url && p.url !== '#' ? `<button class="notifyBtn ${p.notifyEnabled?'on':''}" onclick="toggleNotification(${p.id})">${p.notifyEnabled?'🔔 On':'🔔 Notify'}</button>` : ''}
-        <button class="notifyBtn" onclick="deletePlace(${p.id})" style="background:#fee2e2;color:#991b1b">🗑 Delete</button>
+      <div class="pinActions">
+        <button type="button" class="pinAction show" onclick="showPlaceOnMap(${p.id})">
+          <span class="pinActionLeft">🗺 <span>Show on map</span></span><span class="pinActionChevron">›</span>
+        </button>
+        <a class="pinAction map" href="${escapeHtml(p.googleMapsUri || ('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(Number(p.lat)+','+Number(p.lng))))}" target="_blank" rel="noopener noreferrer">
+          <span class="pinActionLeft">📍 <span>Open in Google Maps</span></span><span class="pinActionChevron">›</span>
+        </a>
+        ${p.url && p.url !== '#' ? `<button type="button" class="pinAction notify ${p.notifyEnabled?'on':''}" onclick="toggleNotification(${p.id})"><span class="pinActionLeft">${p.notifyEnabled?'🔔':'🔕'} <span>${p.notifyEnabled?'Notifications On':'Notifications Off'}</span></span><span class="pinActionChevron">›</span></button>` : ''}
+        <button type="button" class="pinAction delete" onclick="deletePlace(${p.id})">
+          <span class="pinActionLeft">🗑 <span>Delete pin</span></span><span class="pinActionChevron">›</span>
+        </button>
       </div>
     </div>
   </div>`;
@@ -1069,11 +1085,10 @@ function render(){
       const thumbnailHtml = reelUrl!=='#' && thumbnailUrl!=='#'
         ? `<a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Open Reel"><img src="${escapeHtml(thumbnailUrl)}" alt="Reel thumbnail" style="display:block;width:100%;max-width:280px;height:auto;max-height:180px;object-fit:cover;border-radius:10px;margin:0 0 10px;cursor:pointer" onerror="this.style.display='none'"></a>`
         : '';
-      const reelLink=reelUrl!=='#'
-        ? `<br><a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" style="font-weight:600">🔗 Open Reel ↗</a>`
-        : '';
-      const googleMapsLink =
-        `<br><br><a href="${escapeHtml(p.googleMapsUri || ('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(Number(p.lat)+','+Number(p.lng))))}" target="_blank" rel="noopener noreferrer" style="font-weight:600">📍 Open in Google Maps ↗</a>`;
+      const googleMapsHref=safeUrl(
+        p.googleMapsUri ||
+        ('https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(Number(p.lat)+','+Number(p.lng)))
+      );
       const popupThumbUrl=safeUrl(
         p.thumbnailUrl ||
         buildThumbnailUrl(p.url) ||
@@ -1082,9 +1097,17 @@ function render(){
       const popupThumbHtml=popupThumbUrl!=='#' && reelUrl!=='#'
         ? `<a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Open Reel" style="display:block"><img src="${escapeHtml(popupThumbUrl)}" alt="Reel thumbnail" loading="lazy" style="display:block;width:100%;max-width:260px;height:auto;max-height:120px;object-fit:cover;border-radius:10px;margin:0 0 8px 0;cursor:pointer" onerror="this.style.display='none'"></a>`
         : '';
-      const deleteLink=`<br><button onclick="deletePlace(${p.id})" style="margin-top:10px;background:#fee2e2;color:#991b1b;padding:7px 10px;border-radius:8px;border:0;font-weight:600">🗑 Delete pin</button>`;
+      const popupActions =
+        `<div class="pinActionsPopup">
+          <a class="pinAction map" href="${escapeHtml(googleMapsHref)}" target="_blank" rel="noopener noreferrer">
+            <span class="pinActionLeft">📍 <span>Open in Google Maps</span></span><span class="pinActionChevron">›</span>
+          </a>
+          <button type="button" class="pinAction delete" onclick="deletePlace(${p.id})">
+            <span class="pinActionLeft">🗑 <span>Delete pin</span></span><span class="pinActionChevron">›</span>
+          </button>
+        </div>`;
       const popupContent =
-        `${popupThumbHtml}<b>${escapeHtml(p.title)}</b><br>${escapeHtml(p.location)}${reelLink}${googleMapsLink}${deleteLink}`;
+        `${popupThumbHtml}<b>${escapeHtml(p.title)}</b><br>${escapeHtml(p.location)}${popupActions}`;
       const starCount=radiusToStars(Number(p.notifyRadius||2));
       const marker=L.marker([p.lat,p.lng], starCount===5 ? {icon:TRAVELRADAR_GOLD_PIN_ICON} : undefined).addTo(map).bindPopup(
         popupContent,
@@ -1120,7 +1143,7 @@ function render(){
 
     // Reopen the pin popup after a render() refresh (for example after
     // a GPS/geofence update). This prevents the popup from disappearing
-    // while the user is trying to tap View Reel or Delete.
+    // while the user is interacting with the pin actions.
     if(reopenPinId!==null && reopenPinId!==undefined){
       const markerToReopen=markers.find(m=>{
         const ll=m.getLatLng();
