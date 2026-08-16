@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.24</title>
+  <title>TravelRadar v2.5.27</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -17,7 +17,7 @@
     input,select,button{font:inherit}.input{width:100%;padding:12px;border:1px solid var(--border);border-radius:12px;background:white}
     button{border:0;border-radius:12px;padding:11px 14px;background:linear-gradient(135deg,var(--accent2),var(--accent));color:white;font-weight:700;box-shadow:0 4px 12px #0ea5e925}
     button:disabled{opacity:.45;cursor:not-allowed}.secondary{background:#eaf4ff;color:#075985;box-shadow:none}
-    #map{height:360px;border-radius:15px;overflow:hidden;margin-top:10px}.chips{display:flex;gap:8px;overflow:auto;padding:3px 0 5px}.chip{white-space:nowrap;padding:8px 11px;border-radius:999px;border:1px solid var(--border);background:white;font-size:13px}.chip.active{background:#dbeafe;border-color:#93c5fd;color:#1d4ed8}
+    #map{height:360px;border-radius:15px;overflow:hidden;margin-top:10px}
     .place{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}.place:last-child{border-bottom:0}.dot{width:42px;height:42px;border-radius:12px;background:#dbeafe;display:grid;place-items:center;font-size:20px}
     nav{position:sticky;bottom:0;background:#ffffffed;backdrop-filter:blur(12px);padding:10px max(14px,env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom));display:flex;justify-content:space-around;border-top:1px solid var(--border)}
     nav button{background:transparent;color:var(--muted);padding:7px 12px}.primary{color:var(--accent)}
@@ -74,9 +74,36 @@
       text-shadow:0 1px 2px rgba(100,60,0,.35);
     }
   </style>
+
+
+
+<style id="travellradar-v2525-design-system">
+:root{
+  --tr-primary:#1473e6;
+  --tr-border:#e3e8ef;
+  --tr-text:#152033;
+  --tr-muted:#667085;
+  --tr-radius:16px;
+}
+body{
+  color:var(--tr-text);
+}
+button{
+  border-radius:12px;
+  font-weight:600;
+}
+.card,.panel,.section,.pin-card,.saved-place,.location-card{
+  border-color:var(--tr-border);
+  border-radius:var(--tr-radius);
+}
+</style>
+
+
+
+<style>.nearby-card{padding-top:18px;padding-bottom:18px}.nearby-card .row{min-height:62px}</style>
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.24</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.27</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -132,12 +159,9 @@
     </div>
   </section>
 
-  <section class="card">
+  <section class="card nearby-card">
     <div class="row"><div class="grow"><b>Nearby</b><div id="locationStatus" class="muted">Getting your location…</div></div>
-      <select id="radius" class="input" style="width:auto" onchange="window._travelRadarFitMap=true;render()"><option value="0.5">500 m</option><option value="2">2 km</option><option value="5">5 km</option><option value="10">10 km</option><option value="25">25 km</option><option value="50">50 km</option><option value="all" selected>🌍 Worldwide</option></select>
-    </div>
-    <div class="chips" style="margin-top:10px">
-      <button class="chip active" onclick="filterCat('All',this)">All</button><button class="chip" onclick="filterCat('Food',this)">🍝 Food</button><button class="chip" onclick="filterCat('Nature',this)">🌲 Nature</button><button class="chip" onclick="filterCat('Hotel',this)">🏨 Hotel</button><button class="chip" onclick="filterCat('Beach',this)">🏖️ Beach</button>
+      <select id="radius" class="input" style="width:auto" onchange="window._travelRadarFitMap=true;render()"><option value="0.5">500 m</option><option value="2">2 km</option><option value="5">5 km</option><option value="10">10 km</option><option value="25">25 km</option><option value="50">50 km</option><option value="all" selected>Worldwide</option></select>
     </div>
   </section>
 
@@ -175,17 +199,16 @@
   <div id="places"></div>
 </section>
 </main>
-<nav><button class="primary" onclick="scrollTo(0,0)">⌖<br><small>Radar</small></button><button onclick="document.getElementById('url').focus()">＋<br><small>Add Reel</small></button><button onclick="alert('Settings will be expanded in V2.')">⚙<br><small>Settings</small></button></nav>
+<nav><button class="primary" onclick="scrollTo(0,0)">⌖<br><small>Radar</small></button><button onclick="document.getElementById('url').focus()">＋<br><small>Add Reel</small></button></nav>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.24';
+const VERSION='v2.5.27';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
 let lastRenderedRadius='';
-let lastRenderedCat='';
 window._travelRadarFitMap=true;
 
 const TRAVELRADAR_GOLD_PIN_ICON=L.divIcon({
@@ -1358,7 +1381,7 @@ function toggleExactLocation(enabled){
   if(map)render();
 }
 
-// v2.5.24: notifications are controlled only by the global app switch.
+// v2.5.27: notifications are controlled only by the global app switch.
 // Every saved pin uses its configured alert radius when global notifications are ON.
 notificationsEnabled = localStorage.getItem('travelRadarNotificationsEnabled') !== '0';
 notificationPermission = ('Notification' in window && Notification.permission === 'granted');
@@ -2108,5 +2131,17 @@ function showPendingLocation(popupTitle){
 
 window.analyzeReelWithAI=analyzeReelWithAI;
 </script>
+
+<script id="travellradar-v2525-nav-polish">
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("nav button, .bottom-nav button, .tab-bar button").forEach(btn => {
+    const t = (btn.textContent || "").trim().toLowerCase();
+    if (t === "settings" || t === "⚙ settings") {
+      btn.style.display = "none";
+    }
+  });
+});
+</script>
+
 </body>
 </html>
