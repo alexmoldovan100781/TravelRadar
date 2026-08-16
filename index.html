@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.29</title>
+  <title>TravelRadar v2.5.30</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -69,6 +69,9 @@
     .savedDescriptionDetails{
       margin-top:8px;
       font-size:13px;
+    }
+    .leaflet-popup-content .savedDescriptionDetails{
+      margin-top:6px;
     }
     .savedDescriptionDetails summary{
       cursor:pointer;
@@ -149,7 +152,7 @@ button{
 <style>.nearby-card{padding-top:18px;padding-bottom:18px}.nearby-card .row{min-height:62px}</style>
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.29</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.30</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -263,7 +266,7 @@ button{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.29';
+const VERSION='v2.5.30';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -779,7 +782,7 @@ function buildThumbnailUrl(reelUrl){
     '/thumbnail?url='+encodeURIComponent(reelUrl);
 }
 
-// v2.5.29: saved-place descriptions are collapsed and expandable in the list.
+// v2.5.30: saved-place descriptions are collapsed and expandable in the list.
 function normalizeSearchText(value){
   return String(value||'')
     .toLowerCase()
@@ -1261,7 +1264,10 @@ function render(){
           </button>
         </div>`;
       const popupDescription=p.description
-        ? `<div class="savedDescription">${escapeHtml(p.description)}</div>`
+        ? `<details class="savedDescriptionDetails">
+             <summary>Show description</summary>
+             <div class="savedDescription">${escapeHtml(p.description)}</div>
+           </details>`
         : '';
       const popupContent =
         `${popupThumbHtml}<b>${escapeHtml(p.title)}</b><br>${escapeHtml(p.location)}${popupDescription}${popupActions}`;
@@ -1536,7 +1542,7 @@ function toggleExactLocation(enabled){
   if(map)render();
 }
 
-// v2.5.29: notifications are controlled only by the global app switch.
+// v2.5.30: notifications are controlled only by the global app switch.
 // Every saved pin uses its configured alert radius when global notifications are ON.
 notificationsEnabled = localStorage.getItem('travelRadarNotificationsEnabled') !== '0';
 notificationPermission = ('Notification' in window && Notification.permission === 'granted');
