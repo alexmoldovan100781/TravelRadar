@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.35</title>
+  <title>TravelRadar v2.5.36</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -172,10 +172,61 @@ button{
   text-overflow:ellipsis;
   white-space:nowrap;
 }
+
+/* v2.5.36 — Saved places mobile sizing */
+.place{
+  min-width:0;
+}
+.place > .grow{
+  min-width:0;
+  width:0;
+}
+.place .row{
+  min-width:0;
+  width:100%;
+}
+.place .row > .grow{
+  min-width:0;
+  width:0;
+}
+.savedPlaceTitle{
+  min-width:0;
+  width:100%;
+}
+.savedPlaceTitleText{
+  min-width:0;
+  flex:1 1 auto;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.savedStars{
+  flex:0 0 auto;
+  max-width:42%;
+  overflow:hidden;
+  text-overflow:clip;
+  white-space:nowrap;
+  letter-spacing:0.5px;
+}
+.pinActions,
+.pinAction{
+  max-width:100%;
+  box-sizing:border-box;
+}
+@media(max-width:520px){
+  .place{
+    gap:10px;
+  }
+  .savedStars{
+    font-size:15px;
+    max-width:40%;
+    letter-spacing:0;
+  }
+}
 </style>
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.35</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.36</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -289,7 +340,7 @@ button{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.35';
+const VERSION='v2.5.36';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -805,7 +856,7 @@ function buildThumbnailUrl(reelUrl){
     '/thumbnail?url='+encodeURIComponent(reelUrl);
 }
 
-// v2.5.35: saved-place descriptions are collapsed and expandable in the list.
+// v2.5.36: saved-place descriptions are collapsed and expandable in the list.
 function normalizeSearchText(value){
   return String(value||'')
     .toLowerCase()
@@ -1505,8 +1556,7 @@ function updateUserLocationUI(){
     const p=places.find(x=>String(x.id)===String(id));
     if(!p) return;
     el.textContent =
-      p.location +
-      (user ? ' · '+distance(user.lat,user.lng,p.lat,p.lng).toFixed(1)+' km' : '');
+      user ? distance(user.lat,user.lng,p.lat,p.lng).toFixed(1)+' km' : '';
   });
 }
 
@@ -1592,7 +1642,7 @@ function toggleExactLocation(enabled){
   if(map)render();
 }
 
-// v2.5.35: notifications are controlled only by the global app switch.
+// v2.5.36: notifications are controlled only by the global app switch.
 // Every saved pin uses its configured alert radius when global notifications are ON.
 notificationsEnabled = localStorage.getItem('travelRadarNotificationsEnabled') !== '0';
 notificationPermission = ('Notification' in window && Notification.permission === 'granted');
