@@ -277,6 +277,14 @@ button{
   }
 }
 </style>
+
+<style>
+.travelRadarPopupSourceGap{
+  display:inline-block;
+  width:6px;
+}
+</style>
+
 </head>
 <body>
 <header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.38</span></header>
@@ -1435,7 +1443,7 @@ function render(){
         : '';
       const popupPlaceName = p.location || p.title || 'Saved place';
       const popupPlaceTitle =
-        `<div class="travelRadarPopupPlaceTitle">${platformIconMarkup(p.platform)}<b class="travelRadarPopupPlaceTitleText">${escapeHtml(popupPlaceName)}</b></div>`;
+        `<div class="travelRadarPopupPlaceTitle">${platformIconMarkup(p.platform)}<span class="travelRadarPopupSourceGap"></span><b class="travelRadarPopupPlaceTitleText">${escapeHtml(popupPlaceName)}</b></div>`;
       const popupContent =
         `${popupThumbHtml}${popupPlaceTitle}${popupDescription}${popupActions}`;
       const starCount=radiusToStars(Number(p.notifyRadius||2));
