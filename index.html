@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.36</title>
+  <title>TravelRadar v2.5.37</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -57,14 +57,67 @@
     .travelRadarFocusPulse{animation:travelRadarFocusPulse 1s ease-out 2;transform-origin:center}
     @keyframes travelRadarFocusPulse{0%{opacity:.85}100%{opacity:0}}
 
-    .travelRadarGoldPin{
+    /* =====================================================
+       MAP PIN VISUAL SYSTEM — v2.5.37
+       1–2★  = discreet gray
+       3★    = standard blue
+       4★    = accent green + subtle halo
+       5★    = accent orange/gold + strong halo
+       The marker itself carries the rating hierarchy; no
+       extra text or stars are shown on the map.
+       ===================================================== */
+    .travelRadarRatingPinWrap{
+      position:relative;
+      width:42px;height:42px;
+      display:flex;align-items:flex-start;justify-content:center;
+      filter:drop-shadow(0 3px 5px rgba(15,23,42,.22));
+    }
+    .travelRadarRatingPin{
+      position:relative;
       width:34px;height:34px;
-      background:linear-gradient(145deg,#ffd76a,#d99a00);
       border:2px solid #fff;
       border-radius:50% 50% 50% 0;
       transform:rotate(-45deg);
-      box-shadow:0 3px 9px rgba(120,80,0,.38);
       display:flex;align-items:center;justify-content:center;
+      box-sizing:border-box;
+    }
+    .travelRadarRatingPin::after{
+      content:"";
+      width:10px;height:10px;
+      border-radius:50%;
+      background:#fff;
+      box-shadow:0 1px 2px rgba(15,23,42,.10);
+    }
+    .travelRadarRatingPin.rating-low{
+      background:linear-gradient(145deg,#9ca3af,#6b7280);
+    }
+    .travelRadarRatingPin.rating-standard{
+      background:linear-gradient(145deg,#38bdf8,#2563eb);
+    }
+    .travelRadarRatingPin.rating-accent{
+      background:linear-gradient(145deg,#86efac,#16a34a);
+    }
+    .travelRadarRatingPin.rating-accent::before{
+      content:"";
+      position:absolute;
+      inset:-7px;
+      border-radius:50%;
+      background:rgba(34,197,94,.20);
+      filter:blur(5px);
+      z-index:-1;
+    }
+    .travelRadarRatingPin.rating-top{
+      background:linear-gradient(145deg,#fbbf24,#ea8a00);
+      box-shadow:0 0 10px rgba(245,158,11,.48),0 0 22px rgba(245,158,11,.30);
+    }
+    .travelRadarRatingPin.rating-top::before{
+      content:"";
+      position:absolute;
+      inset:-11px;
+      border-radius:50%;
+      background:rgba(245,158,11,.27);
+      filter:blur(7px);
+      z-index:-1;
     }
     .savedDescriptionDetails{
       margin-top:8px;
@@ -226,7 +279,7 @@ button{
 </style>
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.36</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.37</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -340,20 +393,30 @@ button{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.36';
+const VERSION='v2.5.37';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
 let lastRenderedRadius='';
 window._travelRadarFitMap=true;
 
-const TRAVELRADAR_GOLD_PIN_ICON=L.divIcon({
-  className:'',
-  html:'<div class=\"travelRadarGoldPin\"><span>★</span></div>',
-  iconSize:[34,34],
-  iconAnchor:[17,34],
-  popupAnchor:[0,-34]
-});
+function travelRadarRatingPinIcon(stars){
+  const n=Math.max(1,Math.min(5,Number(stars)||3));
+  const ratingClass=n>=5
+    ? 'rating-top'
+    : n===4
+      ? 'rating-accent'
+      : n===3
+        ? 'rating-standard'
+        : 'rating-low';
+  return L.divIcon({
+    className:'',
+    html:`<div class=\"travelRadarRatingPinWrap\" aria-label=\"${n} stars\"><div class=\"travelRadarRatingPin ${ratingClass}\"></div></div>`,
+    iconSize:[42,42],
+    iconAnchor:[21,42],
+    popupAnchor:[0,-42]
+  });
+}
 
 // =====================================================
 // STORAGE RECOVERY / MIGRATION
@@ -1373,7 +1436,7 @@ function render(){
       const popupContent =
         `${popupThumbHtml}<b>${escapeHtml(p.title)}</b><br>${escapeHtml(p.location)}${popupDescription}${popupActions}`;
       const starCount=radiusToStars(Number(p.notifyRadius||2));
-      const marker=L.marker([p.lat,p.lng], starCount===5 ? {icon:TRAVELRADAR_GOLD_PIN_ICON} : undefined).addTo(map).bindPopup(
+      const marker=L.marker([p.lat,p.lng], {icon:travelRadarRatingPinIcon(starCount)}).addTo(map).bindPopup(
         popupContent,
         {autoPan:true,keepInView:true,autoPanPaddingTopLeft:[16,16],autoPanPaddingBottomRight:[16,16],maxWidth:Math.min(300,Math.max(220,window.innerWidth-32)),minWidth:0,maxHeight:Math.max(180,window.innerHeight-120),className:'travelRadarPopup'}
       );
