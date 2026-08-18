@@ -287,7 +287,7 @@ button{
 
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.44</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.45</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -401,7 +401,7 @@ button{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.44';
+const VERSION='v2.5.45';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -449,7 +449,12 @@ function normalizeStoredPin(p,index){
     category:p.category || 'Travel',
     url:p.url || p.reelUrl || p.sourceUrl || p.originalUrl || p.instagramUrl || p.facebookUrl || '#',
     reelUrl:p.reelUrl || p.url || p.sourceUrl || p.originalUrl || p.instagramUrl || p.facebookUrl || '#',
-    sourceUrl:p.sourceUrl || p.originalUrl || p.url || p.reelUrl || p.instagramUrl || p.facebookUrl || '#',
+    sourceUrl:p.sourceUrl || p.originalUrl || p.url || p.reelUrl || p.instagramUrl || p.facebookUrl || p.reel || p.link || p.href || p.shareUrl || p.sourceLink || '#',
+    reel:p.reel || null,
+    link:p.link || null,
+    href:p.href || null,
+    shareUrl:p.shareUrl || null,
+    sourceLink:p.sourceLink || null,
     thumbnailUrl:p.thumbnailUrl || p.thumbnail || null,
     platform:p.platform || null,
     lat,lng,
@@ -1069,9 +1074,26 @@ function safeUrl(url){
   }
 }
 
-// v2.5.44: resolve Reel links from both current and legacy pin schemas.
+// v2.5.45: resolve Reel links from both current and legacy pin schemas.
 // This prevents UI changes from hiding a valid Reel link stored under
 // reelUrl/sourceUrl/originalUrl instead of url.
+function normalizeReelUrl(value){
+  if(value===null || value===undefined) return '#';
+  let s=String(value).trim();
+  if(!s || s==='#') return '#';
+
+  // Recover URLs saved without the protocol.
+  if(/^www\./i.test(s)) s='https://'+s;
+  if(/^(instagram\.com|facebook\.com|m\.facebook\.com|fb\.watch)\//i.test(s)){
+    s='https://'+s;
+  }
+
+  const u=safeUrl(s);
+  if(u!=='#' && /^https?:\/\//i.test(u)) return u;
+
+  return '#';
+}
+
 function getPinReelUrl(p){
   if(!p) return '#';
   const candidates=[
@@ -1080,10 +1102,16 @@ function getPinReelUrl(p){
     p.sourceUrl,
     p.originalUrl,
     p.instagramUrl,
-    p.facebookUrl
+    p.facebookUrl,
+    p.reel,
+    p.reelUrl,
+    p.link,
+    p.href,
+    p.shareUrl,
+    p.sourceLink
   ];
   for(const value of candidates){
-    const u=safeUrl(value);
+    const u=normalizeReelUrl(value);
     if(u!=='#') return u;
   }
   return '#';
@@ -1448,13 +1476,13 @@ function render(){
         ''
       );
       const popupThumbHtml=reelUrl!=='#'
-        ? `<a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Open Reel" style="display:block;width:100%;max-width:260px;margin:0 0 8px 0;cursor:pointer;text-decoration:none">
+        ? `<a class="popupReelThumbLink" href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Open Reel" style="display:block;width:100%;max-width:260px;height:90px;margin:0 0 10px 0;cursor:pointer;text-decoration:none;overflow:hidden;border-radius:10px">
              ${popupThumbUrl!=='#'
                ? `<img src="${escapeHtml(popupThumbUrl)}" alt="Reel thumbnail" loading="lazy"
-                    style="display:block;width:100%;max-width:260px;height:auto;max-height:120px;object-fit:cover;border-radius:10px"
+                    style="display:block;width:100%;height:90px;object-fit:cover;border-radius:10px"
                     onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
                : ''}
-             <div class="savedPinThumbPlaceholder" style="display:${popupThumbUrl!=='#'?'none':'flex'};width:100%;height:90px;max-width:260px;border-radius:10px;align-items:center;justify-content:center;cursor:pointer">📍</div>
+             <div class="savedPinThumbPlaceholder" style="display:${popupThumbUrl!=='#'?'none':'flex'};width:100%;height:90px;border-radius:10px;align-items:center;justify-content:center;cursor:pointer">▶️ Open Reel</div>
            </a>`
         : '';
       const popupActions =
