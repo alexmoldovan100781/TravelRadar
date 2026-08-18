@@ -287,7 +287,7 @@ button{
 
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.41</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.43</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -401,7 +401,7 @@ button{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.41';
+const VERSION='v2.5.43';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -447,7 +447,9 @@ function normalizeStoredPin(p,index){
     id:p.id ?? ('recovered_'+Date.now()+'_'+index+'_'+Math.random().toString(36).slice(2,8)),
     title:p.title || (p.location ? 'Saved place' : 'Recovered pin'),
     category:p.category || 'Travel',
-    url:p.url || p.reelUrl || '#',
+    url:p.url || p.reelUrl || p.sourceUrl || p.originalUrl || p.instagramUrl || p.facebookUrl || '#',
+    reelUrl:p.reelUrl || p.url || p.sourceUrl || p.originalUrl || p.instagramUrl || p.facebookUrl || '#',
+    sourceUrl:p.sourceUrl || p.originalUrl || p.url || p.reelUrl || p.instagramUrl || p.facebookUrl || '#',
     thumbnailUrl:p.thumbnailUrl || p.thumbnail || null,
     platform:p.platform || null,
     lat,lng,
@@ -1067,6 +1069,26 @@ function safeUrl(url){
   }
 }
 
+// v2.5.43: resolve Reel links from both current and legacy pin schemas.
+// This prevents UI changes from hiding a valid Reel link stored under
+// reelUrl/sourceUrl/originalUrl instead of url.
+function getPinReelUrl(p){
+  if(!p) return '#';
+  const candidates=[
+    p.url,
+    p.reelUrl,
+    p.sourceUrl,
+    p.originalUrl,
+    p.instagramUrl,
+    p.facebookUrl
+  ];
+  for(const value of candidates){
+    const u=safeUrl(value);
+    if(u!=='#') return u;
+  }
+  return '#';
+}
+
 
 async function toggleGlobalNotifications(enabled){
   notificationsEnabled=!!enabled;
@@ -1347,11 +1369,16 @@ function render(){
     ?shown.map(p=>{
       const thumb=safeUrl(
         p.thumbnailUrl ||
-        buildThumbnailUrl(p.url) ||
+        buildThumbnailUrl(reelHref) ||
         ''
       );
-      const thumbHtml=thumb!=='#' && safeUrl(p.url)!=='#'
-        ? `<a href="${escapeHtml(safeUrl(p.url))}" target="_blank" rel="noopener noreferrer" aria-label="Open Reel" style="display:block;flex:0 0 auto"><img class="savedPinThumb" src="${escapeHtml(thumb)}" alt="Reel thumbnail" loading="lazy" onerror="this.style.display='none'"></a>`
+      const reelHref=getPinReelUrl(p);
+      const thumbHtml=reelHref!=='#'
+        ? `<a href="${escapeHtml(reelHref)}" target="_blank" rel="noopener noreferrer" aria-label="Open Reel" style="display:block;flex:0 0 auto;text-decoration:none;cursor:pointer">
+             <img class="savedPinThumb" src="${escapeHtml(thumb)}" alt="Reel thumbnail" loading="lazy"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">
+             <div class="savedPinThumbPlaceholder" style="display:none">📍</div>
+           </a>`
         : `<div class="savedPinThumbPlaceholder">📍</div>`;
       const starCount=radiusToStars(Number(p.notifyRadius||2));
       return `<div class="place">
@@ -1405,7 +1432,7 @@ function render(){
     alertCircles.forEach(c=>map.removeLayer(c));
     alertCircles=[];
     shown.forEach(p=>{
-      const reelUrl=safeUrl(p.url);
+      const reelUrl=getPinReelUrl(p);
       const alertRadius=Number(p.notifyRadius||2);
       const thumbnailUrl=safeUrl(p.thumbnailUrl || p.thumbnail || '');
       const thumbnailHtml = reelUrl!=='#' && thumbnailUrl!=='#'
@@ -1417,15 +1444,17 @@ function render(){
       );
       const popupThumbUrl=safeUrl(
         p.thumbnailUrl ||
-        buildThumbnailUrl(p.url) ||
+        buildThumbnailUrl(reelUrl) ||
         ''
       );
-      const popupThumbHtml=popupThumbUrl!=='#' && reelUrl!=='#'
+      const popupThumbHtml=reelUrl!=='#'
         ? `<a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Open Reel" style="display:block;width:100%;max-width:260px;margin:0 0 8px 0;cursor:pointer;text-decoration:none">
-             <img src="${escapeHtml(popupThumbUrl)}" alt="Reel thumbnail" loading="lazy"
-               style="display:block;width:100%;max-width:260px;height:auto;max-height:120px;object-fit:cover;border-radius:10px"
-               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-             <div class="savedPinThumbPlaceholder" style="display:none;width:100%;height:90px;max-width:260px;border-radius:10px;align-items:center;justify-content:center;cursor:pointer">📍</div>
+             ${popupThumbUrl!=='#'
+               ? `<img src="${escapeHtml(popupThumbUrl)}" alt="Reel thumbnail" loading="lazy"
+                    style="display:block;width:100%;max-width:260px;height:auto;max-height:120px;object-fit:cover;border-radius:10px"
+                    onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+               : ''}
+             <div class="savedPinThumbPlaceholder" style="display:${popupThumbUrl!=='#'?'none':'flex'};width:100%;height:90px;max-width:260px;border-radius:10px;align-items:center;justify-content:center;cursor:pointer">📍</div>
            </a>`
         : '';
       const popupActions =
