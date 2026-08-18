@@ -287,11 +287,11 @@ button{
 
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.45</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.46</span></header>
 <main>
   <section class="card">
     <div class="row">
-      <input id="url" class="input grow" placeholder="Paste Instagram or Facebook Reel URL…">
+      <input id="url" class="input grow" placeholder="Paste Instagram or Facebook Reel URL…"><button id="pasteReelBtn" type="button" class="secondary-btn" style="white-space:nowrap">Paste link</button>
       <button onclick="prepareReel()">Add</button>
       <button class="secondary" onclick="clearUrl()">Clear</button>
     </div>
@@ -401,7 +401,7 @@ button{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.45';
+const VERSION='v2.5.46';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -1074,7 +1074,7 @@ function safeUrl(url){
   }
 }
 
-// v2.5.45: resolve Reel links from both current and legacy pin schemas.
+// v2.5.46: resolve Reel links from both current and legacy pin schemas.
 // This prevents UI changes from hiding a valid Reel link stored under
 // reelUrl/sourceUrl/originalUrl instead of url.
 function normalizeReelUrl(value){
@@ -2570,6 +2570,53 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.style.display = "none";
     }
   });
+});
+
+// v2.5.46 — iPhone-friendly explicit clipboard paste.
+async function pasteReelLink(){
+  const input=document.getElementById('url');
+  const btn=document.getElementById('pasteReelBtn');
+  if(!input) return;
+
+  const original=btn ? btn.textContent : 'Paste link';
+  const feedback=(text)=>{
+    if(!btn) return;
+    btn.textContent=text;
+    setTimeout(()=>{btn.textContent=original;},1400);
+  };
+
+  // Preferred path on iOS Safari / installed Web Apps.
+  try{
+    if(navigator.clipboard && typeof navigator.clipboard.readText==='function'){
+      const text=(await navigator.clipboard.readText()).trim();
+      if(text){
+        input.value=text;
+        input.dispatchEvent(new Event('input',{bubbles:true}));
+        input.dispatchEvent(new Event('change',{bubbles:true}));
+        input.focus();
+        feedback('Pasted ✓');
+        return;
+      }
+    }
+  }catch(e){}
+
+  // iOS/local-file fallback: focus the input so the native Paste action is
+  // available, and give the user a clear instruction rather than failing.
+  input.focus();
+  try{ input.setSelectionRange(input.value.length,input.value.length); }catch(e){}
+  feedback('Tap Paste');
+  setTimeout(()=>{
+    try{
+      if(confirm('Paste the Instagram or Facebook Reel link into the field?')){
+        input.focus();
+        document.execCommand('paste');
+      }
+    }catch(e){}
+  },50);
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('pasteReelBtn')?.addEventListener('click',pasteReelLink);
 });
 </script>
 
