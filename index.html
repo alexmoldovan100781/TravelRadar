@@ -287,7 +287,7 @@ button{
 
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.43</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.44</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -401,7 +401,7 @@ button{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.43';
+const VERSION='v2.5.44';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -1069,7 +1069,7 @@ function safeUrl(url){
   }
 }
 
-// v2.5.43: resolve Reel links from both current and legacy pin schemas.
+// v2.5.44: resolve Reel links from both current and legacy pin schemas.
 // This prevents UI changes from hiding a valid Reel link stored under
 // reelUrl/sourceUrl/originalUrl instead of url.
 function getPinReelUrl(p){
@@ -1367,12 +1367,12 @@ function render(){
   if(viewChanged){
     document.getElementById('places').innerHTML=shown.length
     ?shown.map(p=>{
+      const reelHref=getPinReelUrl(p);
       const thumb=safeUrl(
         p.thumbnailUrl ||
         buildThumbnailUrl(reelHref) ||
         ''
       );
-      const reelHref=getPinReelUrl(p);
       const thumbHtml=reelHref!=='#'
         ? `<a href="${escapeHtml(reelHref)}" target="_blank" rel="noopener noreferrer" aria-label="Open Reel" style="display:block;flex:0 0 auto;text-decoration:none;cursor:pointer">
              <img class="savedPinThumb" src="${escapeHtml(thumb)}" alt="Reel thumbnail" loading="lazy"
