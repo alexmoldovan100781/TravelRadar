@@ -287,11 +287,12 @@ button{
 
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.47</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.49</span></header>
 <main>
-  <section class="card">
-    <div class="row">
-      <input id="url" class="input grow" placeholder="Paste Instagram or Facebook Reel URL…"><button id="pasteReelBtn" type="button" class="tr-btn tr-btn-secondary" style="white-space:nowrap">🔗 Paste link</button>
+  <section class="card reel-url-card">
+    <input id="url" class="input" placeholder="Paste Instagram or Facebook Reel URL…">
+    <div class="reel-url-actions">
+      <button id="pasteReelBtn" type="button" class="tr-btn tr-btn-secondary">🔗 Paste link</button>
       <button class="tr-btn tr-btn-primary" onclick="prepareReel()">＋ Add</button>
       <button class="tr-btn tr-btn-neutral" onclick="clearUrl()">× Clear</button>
     </div>
@@ -356,6 +357,10 @@ button{
     </div>
   </section>
 
+  <section class="card"><b>Map</b><div id="map"></div></section>
+
+
+
   <section class="card">
     <div class="row">
       <div class="grow"><b>Location notifications</b><div id="notifyStatus" class="muted">On · permission ready</div></div>
@@ -371,11 +376,7 @@ button{
         <span class="slider"></span>
       </label>
     </div>
-  </section>
-
-  <section class="card"><b>Map</b><div id="map"></div></section>
-
-  <section class="card">
+  </section><section class="card">
   <div class="row">
     <div class="grow"><b>Saved places</b><div class="muted" id="count"></div></div>
   </div>
@@ -401,7 +402,7 @@ button{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.47';
+const VERSION='v2.5.49';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -1074,7 +1075,7 @@ function safeUrl(url){
   }
 }
 
-// v2.5.47: resolve Reel links from both current and legacy pin schemas.
+// v2.5.49: resolve Reel links from both current and legacy pin schemas.
 // This prevents UI changes from hiding a valid Reel link stored under
 // reelUrl/sourceUrl/originalUrl instead of url.
 function normalizeReelUrl(value){
@@ -2572,7 +2573,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// v2.5.47 — iPhone-friendly explicit clipboard paste.
+// v2.5.49 — iPhone-friendly explicit clipboard paste.
 async function pasteReelLink(){
   const input=document.getElementById('url');
   const btn=document.getElementById('pasteReelBtn');
@@ -2585,7 +2586,8 @@ async function pasteReelLink(){
     setTimeout(()=>{btn.textContent=original;},1400);
   };
 
-  // Preferred path on iOS Safari / installed Web Apps.
+  // Direct clipboard read only. Do NOT call execCommand('paste') and do NOT
+  // show a second native paste prompt/menu on iOS.
   try{
     if(navigator.clipboard && typeof navigator.clipboard.readText==='function'){
       const text=(await navigator.clipboard.readText()).trim();
@@ -2597,22 +2599,16 @@ async function pasteReelLink(){
         feedback('Pasted ✓');
         return;
       }
+      feedback('Clipboard empty');
+      return;
     }
-  }catch(e){}
 
-  // iOS/local-file fallback: focus the input so the native Paste action is
-  // available, and give the user a clear instruction rather than failing.
-  input.focus();
-  try{ input.setSelectionRange(input.value.length,input.value.length); }catch(e){}
-  feedback('Tap Paste');
-  setTimeout(()=>{
-    try{
-      if(confirm('Paste the Instagram or Facebook Reel link into the field?')){
-        input.focus();
-        document.execCommand('paste');
-      }
-    }catch(e){}
-  },50);
+    feedback('Paste unavailable');
+  }catch(e){
+    // Clipboard permission may be unavailable for local HTML files/WebViews.
+    // Keep the interaction silent instead of triggering iOS's native Paste UI.
+    feedback('Paste unavailable');
+  }
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
@@ -2820,6 +2816,44 @@ button.secondary,
     height:40px;
     min-height:40px;
     font-size:13px !important;
+  }
+}
+</style>
+
+<style id="travelradar-v2549-layout">
+/* v2.5.49 — URL input uses the full card width; actions sit below it. */
+.reel-url-card{
+  padding:18px;
+}
+.reel-url-card > #url{
+  display:block;
+  width:100%;
+  min-width:0;
+  box-sizing:border-box;
+  margin:0;
+}
+.reel-url-actions{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:9px;
+  margin-top:10px;
+}
+.reel-url-actions .tr-btn{
+  width:100%;
+  min-width:0 !important;
+}
+
+/* On small iPhones keep all three actions on one compact row. */
+@media(max-width:520px){
+  .reel-url-actions{
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:7px;
+  }
+  .reel-url-actions .tr-btn{
+    height:40px;
+    min-height:40px;
+    padding:0 5px;
+    font-size:12px;
   }
 }
 </style>
