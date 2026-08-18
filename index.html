@@ -287,7 +287,7 @@ button{
 
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.40</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.41</span></header>
 <main>
   <section class="card">
     <div class="row">
@@ -401,7 +401,7 @@ button{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.40';
+const VERSION='v2.5.41';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -1421,7 +1421,12 @@ function render(){
         ''
       );
       const popupThumbHtml=popupThumbUrl!=='#' && reelUrl!=='#'
-        ? `<a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Open Reel" style="display:block"><img src="${escapeHtml(popupThumbUrl)}" alt="Reel thumbnail" loading="lazy" style="display:block;width:100%;max-width:260px;height:auto;max-height:120px;object-fit:cover;border-radius:10px;margin:0 0 8px 0;cursor:pointer" onerror="this.style.display='none'"></a>`
+        ? `<a href="${escapeHtml(reelUrl)}" target="_blank" rel="noopener noreferrer" aria-label="Open Reel" style="display:block;width:100%;max-width:260px;margin:0 0 8px 0;cursor:pointer;text-decoration:none">
+             <img src="${escapeHtml(popupThumbUrl)}" alt="Reel thumbnail" loading="lazy"
+               style="display:block;width:100%;max-width:260px;height:auto;max-height:120px;object-fit:cover;border-radius:10px"
+               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+             <div class="savedPinThumbPlaceholder" style="display:none;width:100%;height:90px;max-width:260px;border-radius:10px;align-items:center;justify-content:center;cursor:pointer">📍</div>
+           </a>`
         : '';
       const popupActions =
         `<div class="pinActionsPopup">
