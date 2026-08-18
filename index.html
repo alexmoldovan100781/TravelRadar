@@ -287,13 +287,13 @@ button{
 
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.46</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.47</span></header>
 <main>
   <section class="card">
     <div class="row">
-      <input id="url" class="input grow" placeholder="Paste Instagram or Facebook Reel URL…"><button id="pasteReelBtn" type="button" class="secondary-btn" style="white-space:nowrap">Paste link</button>
-      <button onclick="prepareReel()">Add</button>
-      <button class="secondary" onclick="clearUrl()">Clear</button>
+      <input id="url" class="input grow" placeholder="Paste Instagram or Facebook Reel URL…"><button id="pasteReelBtn" type="button" class="tr-btn tr-btn-secondary" style="white-space:nowrap">🔗 Paste link</button>
+      <button class="tr-btn tr-btn-primary" onclick="prepareReel()">＋ Add</button>
+      <button class="tr-btn tr-btn-neutral" onclick="clearUrl()">× Clear</button>
     </div>
     
 
@@ -340,10 +340,10 @@ button{
          </select>
        </div>
        <div class="row" style="margin-top:10px">
-        <button onclick="analyzeReelWithAI()">📍 Detect from Reel</button>
-        <button class="secondary" onclick="detectReelLocation()">📍 Search location</button>
-        <button id="saveBtn" onclick="saveReel()" disabled>Save</button>
-        <button class="secondary" onclick="clearReel()">Clear</button>
+        <button class="tr-btn tr-btn-purple" onclick="analyzeReelWithAI()">▷ Detect from Reel</button>
+        <button class="tr-btn tr-btn-cyan" onclick="detectReelLocation()">⌖ Search location</button>
+        <button id="saveBtn" class="tr-btn tr-btn-success" onclick="saveReel()" disabled>✓ Save</button>
+        <button class="tr-btn tr-btn-neutral" onclick="clearReel()">× Clear</button>
       </div>
       <div id="locationStatusReel" class="status muted">Paste the Reel URL and tap 📍 Detect from Reel. If the caption does not contain a usable location, enter it manually.</div>
       <div id="aiResult" class="hidden" style="margin-top:10px"></div>
@@ -401,7 +401,7 @@ button{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.46';
+const VERSION='v2.5.47';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -1074,7 +1074,7 @@ function safeUrl(url){
   }
 }
 
-// v2.5.46: resolve Reel links from both current and legacy pin schemas.
+// v2.5.47: resolve Reel links from both current and legacy pin schemas.
 // This prevents UI changes from hiding a valid Reel link stored under
 // reelUrl/sourceUrl/originalUrl instead of url.
 function normalizeReelUrl(value){
@@ -2572,7 +2572,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// v2.5.46 — iPhone-friendly explicit clipboard paste.
+// v2.5.47 — iPhone-friendly explicit clipboard paste.
 async function pasteReelLink(){
   const input=document.getElementById('url');
   const btn=document.getElementById('pasteReelBtn');
@@ -2620,5 +2620,208 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 </script>
 
+
+<style id="travelradar-v2547-button-system">
+:root{
+  --tr-btn-h:42px;
+  --tr-btn-radius:999px;
+  --tr-blue-bg:#eaf3ff;
+  --tr-blue-text:#2563eb;
+  --tr-blue-strong:#1d4ed8;
+  --tr-purple-bg:#f3edff;
+  --tr-purple-text:#7c3aed;
+  --tr-cyan-bg:#e9f9fd;
+  --tr-cyan-text:#087f9f;
+  --tr-green-bg:#eaf9f1;
+  --tr-green-text:#059669;
+  --tr-gray-bg:#f3f4f6;
+  --tr-gray-text:#475569;
+  --tr-red-bg:#fff0f0;
+  --tr-red-text:#dc2626;
+}
+
+/* Core button system */
+button,
+.tr-btn,
+.pinAction,
+.candidateBtn{
+  -webkit-appearance:none;
+  appearance:none;
+  box-sizing:border-box;
+  min-height:var(--tr-btn-h);
+  border-radius:var(--tr-btn-radius);
+  font-size:14px;
+  font-weight:600;
+  line-height:1;
+  letter-spacing:-.01em;
+  box-shadow:none;
+  transition:transform .12s ease,background-color .12s ease,border-color .12s ease;
+}
+
+button:active,
+.tr-btn:active,
+.pinAction:active,
+.candidateBtn:active{
+  transform:scale(.98);
+}
+
+button:disabled,
+.tr-btn:disabled{
+  opacity:.48;
+  cursor:not-allowed;
+  transform:none;
+}
+
+/* Main compact pill buttons */
+.tr-btn{
+  min-width:108px;
+  height:var(--tr-btn-h);
+  padding:0 16px;
+  border:1px solid transparent;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  white-space:nowrap;
+  cursor:pointer;
+}
+
+.tr-btn-primary{
+  background:#e7f0ff !important;
+  color:var(--tr-blue-strong) !important;
+  border-color:#cfe0ff !important;
+}
+.tr-btn-primary:hover{background:#dceaff !important}
+
+.tr-btn-secondary{
+  background:var(--tr-blue-bg) !important;
+  color:var(--tr-blue-text) !important;
+  border-color:#d4e5ff !important;
+}
+.tr-btn-secondary:hover{background:#deecff !important}
+
+.tr-btn-neutral{
+  background:var(--tr-gray-bg) !important;
+  color:var(--tr-gray-text) !important;
+  border-color:#e2e5e9 !important;
+}
+.tr-btn-neutral:hover{background:#e9ecef !important}
+
+.tr-btn-purple{
+  background:var(--tr-purple-bg) !important;
+  color:var(--tr-purple-text) !important;
+  border-color:#dfd2ff !important;
+}
+.tr-btn-purple:hover{background:#ece3ff !important}
+
+.tr-btn-cyan{
+  background:var(--tr-cyan-bg) !important;
+  color:var(--tr-cyan-text) !important;
+  border-color:#cceff7 !important;
+}
+.tr-btn-cyan:hover{background:#ddf5fa !important}
+
+.tr-btn-success{
+  background:var(--tr-green-bg) !important;
+  color:var(--tr-green-text) !important;
+  border-color:#ccefe0 !important;
+}
+.tr-btn-success:hover{background:#def6e9 !important}
+
+/* Existing generic buttons that have not yet been assigned a semantic class */
+button.secondary,
+.secondary-btn{
+  background:var(--tr-gray-bg) !important;
+  color:var(--tr-gray-text) !important;
+  border:1px solid #e2e5e9 !important;
+}
+
+/* Saved-place action buttons: same compact pill language, role-based colors */
+.pinAction{
+  min-height:42px;
+  height:42px;
+  padding:0 14px;
+  border-radius:999px !important;
+  border:1px solid #d8e8fb !important;
+  background:#eef7ff !important;
+  color:#1769aa !important;
+  font-size:14px !important;
+  font-weight:600 !important;
+}
+.pinActions .pinAction:nth-child(2){
+  background:#f0f6ff !important;
+  border-color:#d6e4fb !important;
+  color:#315fb8 !important;
+}
+.pinActions .pinAction:nth-child(3){
+  background:var(--tr-red-bg) !important;
+  border-color:#ffd0d0 !important;
+  color:var(--tr-red-text) !important;
+}
+.pinAction:hover{filter:brightness(.985)}
+
+.pinAction .pinActionLeft{gap:7px}
+.pinAction .pinActionChevron{font-size:16px}
+
+/* Location candidates follow the same compact system, but remain full-width. */
+.candidateBtn{
+  width:100%;
+  min-height:42px;
+  height:auto;
+  padding:10px 14px;
+  border:1px solid #dce7f4 !important;
+  background:#f5f9ff !important;
+  color:var(--tr-text) !important;
+  text-align:left;
+  border-radius:14px !important;
+}
+.candidateBtn small{
+  font-size:11px !important;
+  line-height:1.25;
+}
+
+/* Rows containing button groups */
+.row > .tr-btn{
+  flex:0 0 auto;
+}
+#reelForm .row[style*="margin-top:10px"]{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+#reelForm .row[style*="margin-top:10px"] .tr-btn{
+  min-width:128px;
+}
+
+/* Top Reel URL controls */
+#url + #pasteReelBtn{min-width:112px}
+#url + #pasteReelBtn + .tr-btn{min-width:92px}
+#url + #pasteReelBtn + .tr-btn + .tr-btn{min-width:92px}
+
+/* Mobile: preserve compact pills without forcing horizontal overflow. */
+@media(max-width:520px){
+  .tr-btn{
+    min-width:96px;
+    height:40px;
+    min-height:40px;
+    padding:0 12px;
+    font-size:13px;
+  }
+  #reelForm .row[style*="margin-top:10px"] .tr-btn{
+    min-width:0;
+    flex:1 1 calc(50% - 4px);
+  }
+  #url + #pasteReelBtn,
+  #url + #pasteReelBtn + .tr-btn,
+  #url + #pasteReelBtn + .tr-btn + .tr-btn{
+    min-width:0;
+  }
+  .pinAction{
+    height:40px;
+    min-height:40px;
+    font-size:13px !important;
+  }
+}
+</style>
 </body>
 </html>
