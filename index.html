@@ -287,7 +287,7 @@ button{
 
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.50</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.51</span></header>
 <main>
   <section class="card reel-url-card">
     <input id="url" class="input" placeholder="Paste Instagram or Facebook Reel URL…">
@@ -311,27 +311,17 @@ button{
          <div class="row" style="align-items:flex-end">
            <div class="grow">
              <label style="font-size:17px;line-height:1.3"><b>✨ How badly do you want to see this? ✨</b></label>
-             <div id="reelStarHint" class="muted" style="margin-top:5px">Slide to choose how badly you want to see this.</div>
+             <div id="reelStarHint" class="muted" style="margin-top:5px">Choose how close you want the alert to be.</div>
            </div>
          </div>
-         <div id="reelStarPicker" class="starProgress" role="radiogroup" aria-label="How badly do you want to see this?">
-           <div class="starTrack" aria-hidden="true"></div>
-           <button type="button" class="starChoice" data-radius="0.5" aria-label="1 star — 500 m" onclick="selectReelStar(1)">
-             <span class="moodEmoji">😐</span><span class="moodDistance">500 m</span>
-           </button>
-           <button type="button" class="starChoice" data-radius="1" aria-label="2 stars — 1 km" onclick="selectReelStar(2)">
-             <span class="moodEmoji">🙂</span><span class="moodDistance">1 km</span>
-           </button>
-           <button type="button" class="starChoice selected" data-radius="2" aria-label="3 stars — 2 km" onclick="selectReelStar(3)">
-             <span class="moodEmoji">😃</span><span class="moodDistance">2 km</span>
-           </button>
-           <button type="button" class="starChoice" data-radius="5" aria-label="4 stars — 5 km" onclick="selectReelStar(4)">
-             <span class="moodEmoji">😍</span><span class="moodDistance">5 km</span>
-           </button>
-           <button type="button" class="starChoice" data-radius="10" aria-label="5 stars — 10 km" onclick="selectReelStar(5)">
-             <span class="moodEmoji">🤩</span><span class="moodDistance">10 km</span>
-           </button>
+         <div id="reelStarPicker" class="tr-radius-picker" role="radiogroup" aria-label="How badly do you want to see this?">
+           <button type="button" class="tr-radius-option" data-radius="0.5" aria-label="500 m" onclick="selectReelStar(1)">500 m</button>
+           <button type="button" class="tr-radius-option" data-radius="1" aria-label="1 km" onclick="selectReelStar(2)">1 km</button>
+           <button type="button" class="tr-radius-option selected" data-radius="2" aria-label="2 km" onclick="selectReelStar(3)">2 km</button>
+           <button type="button" class="tr-radius-option" data-radius="5" aria-label="5 km" onclick="selectReelStar(4)">5 km</button>
+           <button type="button" class="tr-radius-option" data-radius="10" aria-label="10 km" onclick="selectReelStar(5)">10 km</button>
          </div>
+         <div id="radiusRecommendation" class="radius-recommendation">◎ 2 km · Recommended</div>
          <select id="reelNotifyRadius" class="hidden">
            <option value="0.5">500 m</option>
            <option value="1">1 km</option>
@@ -402,7 +392,7 @@ button{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.50';
+const VERSION='v2.5.51';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -911,16 +901,22 @@ async function searchLocationWithWorker(query){
 function setReelRadius(km){
   const select=document.getElementById('reelNotifyRadius');
   if(select) select.value=String(km);
-  const buttons=[...document.querySelectorAll('#reelStarPicker .starChoice')];
-  const radii=[0.5,1,2,5,10];
-  const idx=radii.findIndex(v=>Number(v)===Number(km));
-  const stars=idx>=0 ? idx+1 : 3;
-  buttons.forEach((b,i)=>{
-    b.classList.toggle('selected',i===stars-1);
-    b.setAttribute('aria-checked',i===stars-1?'true':'false');
+
+  const buttons=[...document.querySelectorAll('#reelStarPicker .tr-radius-option')];
+  buttons.forEach(b=>{
+    const active=Number(b.dataset.radius)===Number(km);
+    b.classList.toggle('selected',active);
+    b.setAttribute('aria-checked',active?'true':'false');
   });
+
   const hint=document.getElementById('reelStarHint');
-  if(hint) hint.textContent='Slide to choose how badly you want to see this.';
+  if(hint) hint.textContent='Choose how close you want the alert to be.';
+
+  const rec=document.getElementById('radiusRecommendation');
+  if(rec){
+    const formatted=Number(km)<1 ? Math.round(Number(km)*1000)+' m' : Number(km)+' km';
+    rec.textContent='◎ '+formatted+' · Recommended';
+  }
 }
 
 function selectReelStar(stars){
@@ -1095,7 +1091,7 @@ function safeUrl(url){
   }
 }
 
-// v2.5.50: resolve Reel links from both current and legacy pin schemas.
+// v2.5.51: resolve Reel links from both current and legacy pin schemas.
 // This prevents UI changes from hiding a valid Reel link stored under
 // reelUrl/sourceUrl/originalUrl instead of url.
 function normalizeReelUrl(value){
@@ -2612,7 +2608,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// v2.5.50 — iPhone-friendly explicit clipboard paste.
+// v2.5.51 — iPhone-friendly explicit clipboard paste.
 async function pasteReelLink(){
   const input=document.getElementById('url');
   const btn=document.getElementById('pasteReelBtn');
@@ -2860,7 +2856,7 @@ button.secondary,
 </style>
 
 <style id="travelradar-v2549-layout">
-/* v2.5.50 — URL input uses the full card width; actions sit below it. */
+/* v2.5.51 — URL input uses the full card width; actions sit below it. */
 .reel-url-card{
   padding:18px;
 }
@@ -2904,6 +2900,65 @@ button.secondary,
 }
 #map{
   scroll-margin-top:18px;
+}
+</style>
+
+<style id="travelradar-v2551-radius-final">
+.tr-radius-picker{
+  display:grid !important;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  width:100%;
+  min-height:46px;
+  margin:12px 0 6px !important;
+  padding:0 !important;
+  background:#f4f7fb;
+  border:1px solid #dbe4ef;
+  border-radius:999px;
+  overflow:hidden;
+}
+.tr-radius-option{
+  min-width:0 !important;
+  min-height:44px !important;
+  height:44px !important;
+  padding:0 4px !important;
+  border:0 !important;
+  border-right:1px solid #dbe4ef !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  color:#475569 !important;
+  box-shadow:none !important;
+  font-size:13px !important;
+  font-weight:600 !important;
+  line-height:1 !important;
+  display:flex !important;
+  align-items:center;
+  justify-content:center;
+  white-space:nowrap;
+}
+.tr-radius-option:last-child{border-right:0 !important}
+.tr-radius-option.selected{
+  background:#2f6fed !important;
+  color:#fff !important;
+}
+.tr-radius-option:active{transform:scale(.98)}
+.radius-recommendation{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:24px;
+  margin:2px 0 4px;
+  color:#2563eb;
+  font-size:12px;
+  font-weight:600;
+}
+@media(max-width:520px){
+  .tr-radius-picker{min-height:44px}
+  .tr-radius-option{
+    min-height:42px !important;
+    height:42px !important;
+    padding:0 2px !important;
+    font-size:12px !important;
+  }
 }
 </style>
 </body>
