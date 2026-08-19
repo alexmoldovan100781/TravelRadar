@@ -287,7 +287,7 @@ button{
 
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.52</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.53</span></header>
 <main>
   <section class="card reel-url-card">
     <input id="url" class="input" placeholder="Paste Instagram or Facebook Reel URL…">
@@ -431,7 +431,7 @@ button{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.52';
+const VERSION='v2.5.53';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -784,7 +784,6 @@ function prepareReel(){
   },80);
 }
 
-async 
 function showSaveStep(locationName){
   document.getElementById('stepLocation').classList.remove('hidden');
   document.getElementById('stepSave').classList.remove('hidden');
@@ -803,7 +802,7 @@ function showSaveStep(locationName){
   },120);
 }
 
-function detectReelLocation(){
+async function detectReelLocation(){
   const query=document.getElementById('locationInput').value.trim();
   if(!query){
     setReelStatus('Please enter a place, city or landmark first.','error');
@@ -1145,7 +1144,7 @@ function safeUrl(url){
   }
 }
 
-// v2.5.52: resolve Reel links from both current and legacy pin schemas.
+// v2.5.53: resolve Reel links from both current and legacy pin schemas.
 // This prevents UI changes from hiding a valid Reel link stored under
 // reelUrl/sourceUrl/originalUrl instead of url.
 function normalizeReelUrl(value){
@@ -1815,12 +1814,17 @@ function initMap(){
   const searchField=document.getElementById('savedSearch');
   if(searchField)searchField.value=travelRadarSavedSearch||'';
 
-  // No fake/default user location. The map starts neutral and is
-  // repositioned only after real GPS coordinates are available
-  // or when "All" is selected and saved pins can define the bounds.
-  map=L.map('map').setView([20,0],2);
+  const mapEl=document.getElementById('map');
+  if(!mapEl)return;
+
+  // Neutral initial view; render() will fit saved pins / Worldwide as needed.
+  map=L.map(mapEl).setView([20,0],2);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(map);
-  render();
+
+  setTimeout(()=>{
+    if(map)map.invalidateSize(true);
+    render();
+  },60);
 }
 
 async function updateExactLocationPermissionUI(){
@@ -1940,7 +1944,7 @@ function startManualLocation(){
   setReelStatus('Enter the place, city or landmark, then tap Search location.','');
 }
 
-function analyzeReelWithAI(){
+async function analyzeReelWithAI(){
   const url=normalizeSocialUrl(document.getElementById('url').value);
   document.getElementById('url').value=url;
   if(!url){
@@ -2687,7 +2691,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// v2.5.52 — iPhone-friendly explicit clipboard paste.
+// v2.5.53 — iPhone-friendly explicit clipboard paste.
 async function pasteReelLink(){
   const input=document.getElementById('url');
   const btn=document.getElementById('pasteReelBtn');
@@ -2935,7 +2939,7 @@ button.secondary,
 </style>
 
 <style id="travelradar-v2549-layout">
-/* v2.5.52 — URL input uses the full card width; actions sit below it. */
+/* v2.5.53 — URL input uses the full card width; actions sit below it. */
 .reel-url-card{
   padding:18px;
 }
