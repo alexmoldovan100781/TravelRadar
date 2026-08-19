@@ -287,7 +287,7 @@ button{
 
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.51</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.52</span></header>
 <main>
   <section class="card reel-url-card">
     <input id="url" class="input" placeholder="Paste Instagram or Facebook Reel URL…">
@@ -298,46 +298,85 @@ button{
     </div>
     
 
-    <div id="reelForm" class="hidden" style="margin-top:14px">
-      <input id="locationInput" class="input" placeholder="Enter place, city or landmark…">
-      <div style="margin-top:12px">
-        <label for="shortDescription" style="display:block;font-size:14px;font-weight:700;margin-bottom:6px">Short description</label>
-        <textarea id="shortDescription" class="input" rows="4" maxlength="2000"
-          placeholder="Add a short description for this saved place…"
-          style="resize:vertical;min-height:92px;line-height:1.45"></textarea>
-        <div class="muted" style="margin-top:5px">Pre-filled with the Reel caption. You can edit it before saving.</div>
+    <div id="reelForm" class="hidden tr-reel-flow" style="margin-top:14px">
+      <div class="tr-stepper" aria-label="Add a place progress">
+        <div class="tr-step active" data-step="1"><span>1</span><b>Add Reel</b></div>
+        <div class="tr-step-line"></div>
+        <div class="tr-step" data-step="2"><span>2</span><b>Find location</b></div>
+        <div class="tr-step-line"></div>
+        <div class="tr-step" data-step="3"><span>3</span><b>Save place</b></div>
       </div>
-      <div style="margin-top:12px">
-         <div class="row" style="align-items:flex-end">
-           <div class="grow">
-             <label style="font-size:17px;line-height:1.3"><b>✨ How badly do you want to see this? ✨</b></label>
-             <div id="reelStarHint" class="muted" style="margin-top:5px">Choose how close you want the alert to be.</div>
-           </div>
-         </div>
-         <div id="reelStarPicker" class="tr-radius-picker" role="radiogroup" aria-label="How badly do you want to see this?">
-           <button type="button" class="tr-radius-option" data-radius="0.5" aria-label="500 m" onclick="selectReelStar(1)">500 m</button>
-           <button type="button" class="tr-radius-option" data-radius="1" aria-label="1 km" onclick="selectReelStar(2)">1 km</button>
-           <button type="button" class="tr-radius-option selected" data-radius="2" aria-label="2 km" onclick="selectReelStar(3)">2 km</button>
-           <button type="button" class="tr-radius-option" data-radius="5" aria-label="5 km" onclick="selectReelStar(4)">5 km</button>
-           <button type="button" class="tr-radius-option" data-radius="10" aria-label="10 km" onclick="selectReelStar(5)">10 km</button>
-         </div>
-         <div id="radiusRecommendation" class="radius-recommendation">◎ 2 km · Recommended</div>
-         <select id="reelNotifyRadius" class="hidden">
-           <option value="0.5">500 m</option>
-           <option value="1">1 km</option>
-           <option value="2" selected>2 km</option>
-           <option value="5">5 km</option>
-           <option value="10">10 km</option>
-         </select>
-       </div>
-       <div class="row" style="margin-top:10px">
-        <button class="tr-btn tr-btn-purple" onclick="analyzeReelWithAI()">▷ Detect from Reel</button>
-        <button class="tr-btn tr-btn-cyan" onclick="detectReelLocation()">⌖ Search location</button>
-        <button id="saveBtn" class="tr-btn tr-btn-success" onclick="saveReel()" disabled>✓ Save</button>
-        <button class="tr-btn tr-btn-neutral" onclick="clearReel()">× Clear</button>
+
+      <div id="stepLocation" class="tr-flow-step hidden">
+        <div class="tr-step-title">② Where is this place?</div>
+        <div class="muted tr-step-subtitle">Choose how you want to find the location.</div>
+
+        <div class="tr-location-choice-grid">
+          <button type="button" class="tr-choice tr-choice-primary" onclick="startDetectFromReel()">
+            <span class="tr-choice-icon">✦</span>
+            <span><b>Detect from Reel</b><small>Automatically find the place</small></span>
+          </button>
+          <button type="button" class="tr-choice tr-choice-secondary" onclick="startManualLocation()">
+            <span class="tr-choice-icon">⌖</span>
+            <span><b>Enter location manually</b><small>Type a place, city or landmark</small></span>
+          </button>
+        </div>
+
+        <div id="manualLocationArea" class="hidden tr-manual-location">
+          <label for="locationInput" class="tr-field-label">Location</label>
+          <div class="tr-location-search-row">
+            <input id="locationInput" class="input" placeholder="Enter place, city or landmark…">
+            <button class="tr-btn tr-btn-cyan" onclick="detectReelLocation()">⌖ Search location</button>
+          </div>
+        </div>
+
+        <div id="aiResult" class="hidden" style="margin-top:10px"></div>
       </div>
-      <div id="locationStatusReel" class="status muted">Paste the Reel URL and tap 📍 Detect from Reel. If the caption does not contain a usable location, enter it manually.</div>
-      <div id="aiResult" class="hidden" style="margin-top:10px"></div>
+
+      <div id="stepSave" class="hidden tr-flow-step">
+        <div class="tr-step-title">③ Save this place</div>
+        <div class="muted tr-step-subtitle">Your location is ready. Review the details and save it.</div>
+
+        <div id="locationFoundSummary" class="tr-location-found hidden">
+          <span>✓</span>
+          <div><small>Location found</small><b id="locationFoundName"></b></div>
+        </div>
+
+        <div style="margin-top:12px">
+          <label for="shortDescription" class="tr-field-label">Short description</label>
+          <textarea id="shortDescription" class="input" rows="4" maxlength="2000"
+            placeholder="Add a short description for this saved place…"
+            style="resize:vertical;min-height:92px;line-height:1.45"></textarea>
+          <div class="muted" style="margin-top:5px">Pre-filled with the Reel caption. You can edit it before saving.</div>
+        </div>
+
+        <div style="margin-top:14px">
+          <div class="tr-step-title tr-step-title-small">How close do you want the alert to be?</div>
+          <div id="reelStarHint" class="muted" style="margin-top:5px">Choose how close you want the alert to be.</div>
+          <div id="reelStarPicker" class="tr-radius-picker" role="radiogroup" aria-label="Alert radius">
+            <button type="button" class="tr-radius-option" data-radius="0.5" aria-label="500 m" onclick="selectReelStar(1)">500 m</button>
+            <button type="button" class="tr-radius-option" data-radius="1" aria-label="1 km" onclick="selectReelStar(2)">1 km</button>
+            <button type="button" class="tr-radius-option selected" data-radius="2" aria-label="2 km" onclick="selectReelStar(3)">2 km</button>
+            <button type="button" class="tr-radius-option" data-radius="5" aria-label="5 km" onclick="selectReelStar(4)">5 km</button>
+            <button type="button" class="tr-radius-option" data-radius="10" aria-label="10 km" onclick="selectReelStar(5)">10 km</button>
+          </div>
+          <div id="radiusRecommendation" class="radius-recommendation">◎ 2 km · Recommended</div>
+          <select id="reelNotifyRadius" class="hidden">
+            <option value="0.5">500 m</option>
+            <option value="1">1 km</option>
+            <option value="2" selected>2 km</option>
+            <option value="5">5 km</option>
+            <option value="10">10 km</option>
+          </select>
+        </div>
+
+        <div class="tr-save-actions">
+          <button id="saveBtn" class="tr-btn tr-btn-success" onclick="saveReel()" disabled>✓ Save place</button>
+          <button class="tr-btn tr-btn-neutral" onclick="clearReel()">× Clear</button>
+        </div>
+      </div>
+
+      <div id="locationStatusReel" class="status muted tr-flow-status">Paste a Reel link, then tap Add.</div>
     </div>
   </section>
 
@@ -392,7 +431,7 @@ button{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.51';
+const VERSION='v2.5.52';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -729,32 +768,42 @@ function prepareReel(){
   nativeInstagramLocation=null;
   setReelRadius(2);
   document.getElementById('reelForm').classList.remove('hidden');
-  document.getElementById('saveBtn').disabled=true;
+  document.getElementById('stepLocation').classList.remove('hidden');
+  document.getElementById('stepSave').classList.add('hidden');
+  document.getElementById('manualLocationArea').classList.add('hidden');
+  document.getElementById('aiResult').classList.add('hidden');
+  updateReelFlowStep(2);
+  setReelStatus('Next: choose Detect from Reel or enter the location manually.','');
 
-  // After Add, position the page so the first visible row is the
-  // manual-location field. A small offset keeps the field comfortably
-  // below the top edge/header on iPhone.
   setTimeout(()=>{
-    const locationField=document.getElementById('locationInput');
-    if(locationField){
-      locationField.scrollIntoView({
-        behavior:'smooth',
-        block:'start'
-      });
-      setTimeout(()=>{
-        window.scrollBy({
-          top:-18,
-          left:0,
-          behavior:'smooth'
-        });
-      },180);
-      locationField.focus();
+    const step=document.getElementById('stepLocation');
+    if(step){
+      step.scrollIntoView({behavior:'smooth',block:'start'});
+      setTimeout(()=>window.scrollBy({top:-18,left:0,behavior:'smooth'}),180);
     }
   },80);
-  setReelStatus('Tap 📍 Detect from Reel. If automatic detection fails, search the location with Google Places.','');
 }
 
-async function detectReelLocation(){
+async 
+function showSaveStep(locationName){
+  document.getElementById('stepLocation').classList.remove('hidden');
+  document.getElementById('stepSave').classList.remove('hidden');
+  const manual=document.getElementById('manualLocationArea');
+  if(manual)manual.classList.add('hidden');
+
+  const name=document.getElementById('locationFoundName');
+  const summary=document.getElementById('locationFoundSummary');
+  if(name)name.textContent=locationName||'Location found';
+  if(summary)summary.classList.remove('hidden');
+
+  updateReelFlowStep(3);
+  setTimeout(()=>{
+    const step=document.getElementById('stepSave');
+    if(step)step.scrollIntoView({behavior:'smooth',block:'start'});
+  },120);
+}
+
+function detectReelLocation(){
   const query=document.getElementById('locationInput').value.trim();
   if(!query){
     setReelStatus('Please enter a place, city or landmark first.','error');
@@ -798,7 +847,8 @@ async function detectReelLocation(){
         </span>
       </div>`;
 
-    setReelStatus('Location found. You can save it.','detected');
+    showSaveStep(detectedLocation.location);
+    setReelStatus('Location found. Review the details and save it.','detected');
     const saveButton=document.getElementById('saveBtn');
     if(saveButton)saveButton.disabled=false;
     showPendingLocation(detectedLocation.location);
@@ -1018,7 +1068,7 @@ async function saveReel(){
     }finally{
       if(saveButton){
         saveButton.disabled=false;
-        saveButton.textContent='Save';
+        saveButton.textContent='✓ Save place';
       }
     }
   }
@@ -1059,7 +1109,11 @@ function clearReel(){
   selectedCandidateIndex=-1;
   nativeInstagramLocation=null;
   document.getElementById('reelForm').classList.add('hidden');
+  document.getElementById('stepLocation').classList.remove('hidden');
+  document.getElementById('stepSave').classList.add('hidden');
+  document.getElementById('manualLocationArea').classList.add('hidden');
   document.getElementById('locationInput').value='';
+  updateReelFlowStep(1);
   const descriptionField=document.getElementById('shortDescription');
   if(descriptionField)descriptionField.value='';
   workerMetadata=null;
@@ -1091,7 +1145,7 @@ function safeUrl(url){
   }
 }
 
-// v2.5.51: resolve Reel links from both current and legacy pin schemas.
+// v2.5.52: resolve Reel links from both current and legacy pin schemas.
 // This prevents UI changes from hiding a valid Reel link stored under
 // reelUrl/sourceUrl/originalUrl instead of url.
 function normalizeReelUrl(value){
@@ -1861,7 +1915,32 @@ updateExactLocationPermissionUI();
 </script>
 
 <script>
-async function analyzeReelWithAI(){
+async 
+function updateReelFlowStep(step){
+  document.querySelectorAll('.tr-step').forEach(el=>{
+    const n=Number(el.dataset.step);
+    el.classList.toggle('active',n===step);
+    el.classList.toggle('complete',n<step);
+  });
+}
+
+function startDetectFromReel(){
+  document.getElementById('manualLocationArea').classList.add('hidden');
+  document.getElementById('aiResult').classList.remove('hidden');
+  analyzeReelWithAI();
+}
+
+function startManualLocation(){
+  document.getElementById('manualLocationArea').classList.remove('hidden');
+  const field=document.getElementById('locationInput');
+  if(field){
+    field.focus();
+    field.scrollIntoView({behavior:'smooth',block:'center'});
+  }
+  setReelStatus('Enter the place, city or landmark, then tap Search location.','');
+}
+
+function analyzeReelWithAI(){
   const url=normalizeSocialUrl(document.getElementById('url').value);
   document.getElementById('url').value=url;
   if(!url){
@@ -1870,8 +1949,10 @@ async function analyzeReelWithAI(){
   }
 
   if(!window.TRAVELRADAR_AI_PROXY){
-    setReelStatus('AI proxy is not configured. Use Manual location.','error');
+    setReelStatus('Automatic detection is unavailable. Enter the location manually.','error');
     document.getElementById('reelForm').classList.remove('hidden');
+    document.getElementById('stepLocation').classList.remove('hidden');
+    startManualLocation();
     return;
   }
 
@@ -2019,10 +2100,7 @@ async function analyzeReelWithAI(){
         'error'
       );
 
-      document.getElementById(
-        'locationInput'
-      ).focus();
-
+      startManualLocation();
       return;
     }
 
@@ -2042,8 +2120,8 @@ async function analyzeReelWithAI(){
 
     setReelStatus(
       nativeName
-        ? 'Instagram location detected. Choose the location you want to save.'
-        : 'Choose the location you want to save.',
+        ? 'Location detected. Choose the place you want to save.'
+        : 'Location candidates found. Choose the place you want to save.',
       'detected'
     );
 
@@ -2535,7 +2613,8 @@ async function selectLocationCandidate(index){
         </span>
       </div>`;
 
-    setReelStatus('Location mapped. You can save it.','detected');
+    showSaveStep(detectedLocation.location);
+    setReelStatus('Location mapped. Review the details and save it.','detected');
 
     const saveButton=document.getElementById('saveBtn');
     if(saveButton)saveButton.disabled=false;
@@ -2608,7 +2687,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// v2.5.51 — iPhone-friendly explicit clipboard paste.
+// v2.5.52 — iPhone-friendly explicit clipboard paste.
 async function pasteReelLink(){
   const input=document.getElementById('url');
   const btn=document.getElementById('pasteReelBtn');
@@ -2856,7 +2935,7 @@ button.secondary,
 </style>
 
 <style id="travelradar-v2549-layout">
-/* v2.5.51 — URL input uses the full card width; actions sit below it. */
+/* v2.5.52 — URL input uses the full card width; actions sit below it. */
 .reel-url-card{
   padding:18px;
 }
@@ -2959,6 +3038,113 @@ button.secondary,
     padding:0 2px !important;
     font-size:12px !important;
   }
+}
+</style>
+
+<style id="travelradar-v2552-guided-flow">
+.tr-reel-flow{scroll-margin-top:18px}
+.tr-stepper{
+  display:flex;
+  align-items:center;
+  width:100%;
+  margin:2px 0 16px;
+  gap:7px;
+}
+.tr-step{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  color:#94a3b8;
+  font-size:11px;
+  font-weight:600;
+  white-space:nowrap;
+}
+.tr-step span{
+  width:24px;height:24px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:#f1f5f9;border:1px solid #dbe3ec;color:#64748b;
+  font-size:11px;
+}
+.tr-step.active{color:#2563eb}
+.tr-step.active span{
+  background:#eaf3ff;border-color:#9ec9ff;color:#2563eb;
+}
+.tr-step.complete{color:#059669}
+.tr-step.complete span{
+  background:#eaf9f1;border-color:#bfead5;color:#059669;
+}
+.tr-step-line{height:1px;flex:1;background:#e2e8f0;min-width:8px}
+.tr-step-title{font-size:19px;font-weight:750;letter-spacing:-.02em;color:#172033}
+.tr-step-title-small{font-size:15px}
+.tr-step-subtitle{margin-top:4px;font-size:13px}
+.tr-location-choice-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:14px;
+}
+.tr-choice{
+  min-height:72px;
+  border-radius:16px;
+  border:1px solid #d9e4f0;
+  padding:12px 13px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  text-align:left;
+  background:#f8fbff;
+  color:#24324a;
+  box-shadow:none;
+}
+.tr-choice-primary{background:#eef5ff;border-color:#cfe0ff;color:#315fb8}
+.tr-choice-secondary{background:#f7fafc;color:#475569}
+.tr-choice-icon{
+  width:32px;height:32px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:#fff;border:1px solid #dce7f4;
+  flex:0 0 auto;
+}
+.tr-choice b{display:block;font-size:13px}
+.tr-choice small{display:block;margin-top:4px;font-size:11px;color:#718096;font-weight:500}
+.tr-manual-location{
+  margin-top:14px;padding-top:14px;border-top:1px solid #e5ebf2
+}
+.tr-field-label{
+  display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:#273449
+}
+.tr-location-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.tr-location-search-row .tr-btn{min-width:142px}
+.tr-location-found{
+  display:flex;align-items:center;gap:10px;
+  margin-top:12px;padding:10px 12px;
+  border-radius:14px;background:#eefaf4;border:1px solid #ccefe0;color:#087a58
+}
+.tr-location-found>span{width:26px;height:26px;border-radius:50%;background:#dff7eb;display:flex;align-items:center;justify-content:center}
+.tr-location-found small{display:block;font-size:11px;color:#5f7f73}
+.tr-location-found b{display:block;margin-top:2px;font-size:14px;color:#155c49}
+.tr-save-actions{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:14px}
+.tr-save-actions .tr-btn-success{min-width:150px}
+.tr-flow-status{margin-top:12px}
+@media(max-width:520px){
+  .tr-step{font-size:10px;gap:4px}
+  .tr-step span{width:22px;height:22px;font-size:10px}
+  .tr-stepper{gap:4px;margin-bottom:14px}
+  .tr-location-choice-grid{grid-template-columns:1fr;gap:8px}
+  .tr-choice{min-height:64px}
+  .tr-location-search-row{grid-template-columns:1fr}
+  .tr-location-search-row .tr-btn{width:100%;min-width:0}
+  .tr-save-actions{grid-template-columns:1fr 1fr}
+  .tr-save-actions .tr-btn-success{min-width:0}
+}
+</style>
+
+<style id="travelradar-v2552-flow-polish">
+.tr-location-choice-grid + .tr-manual-location{margin-top:16px}
+.tr-choice:focus-visible,
+.tr-radius-option:focus-visible,
+.tr-btn:focus-visible{
+  outline:3px solid rgba(47,111,237,.18);
+  outline-offset:2px;
 }
 </style>
 </body>
