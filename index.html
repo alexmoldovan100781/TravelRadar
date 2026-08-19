@@ -287,7 +287,7 @@ button{
 
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.49</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.50</span></header>
 <main>
   <section class="card reel-url-card">
     <input id="url" class="input" placeholder="Paste Instagram or Facebook Reel URL…">
@@ -402,7 +402,7 @@ button{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.49';
+const VERSION='v2.5.50';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -739,8 +739,28 @@ function prepareReel(){
   nativeInstagramLocation=null;
   setReelRadius(2);
   document.getElementById('reelForm').classList.remove('hidden');
-  document.getElementById('locationInput').focus();
   document.getElementById('saveBtn').disabled=true;
+
+  // After Add, position the page so the first visible row is the
+  // manual-location field. A small offset keeps the field comfortably
+  // below the top edge/header on iPhone.
+  setTimeout(()=>{
+    const locationField=document.getElementById('locationInput');
+    if(locationField){
+      locationField.scrollIntoView({
+        behavior:'smooth',
+        block:'start'
+      });
+      setTimeout(()=>{
+        window.scrollBy({
+          top:-18,
+          left:0,
+          behavior:'smooth'
+        });
+      },180);
+      locationField.focus();
+    }
+  },80);
   setReelStatus('Tap 📍 Detect from Reel. If automatic detection fails, search the location with Google Places.','');
 }
 
@@ -1075,7 +1095,7 @@ function safeUrl(url){
   }
 }
 
-// v2.5.49: resolve Reel links from both current and legacy pin schemas.
+// v2.5.50: resolve Reel links from both current and legacy pin schemas.
 // This prevents UI changes from hiding a valid Reel link stored under
 // reelUrl/sourceUrl/originalUrl instead of url.
 function normalizeReelUrl(value){
@@ -1307,7 +1327,26 @@ function showPlaceOnMap(id){
 
   clearTravelRadarFocusHighlight();
 
-  map.flyTo([Number(p.lat),Number(p.lng)],Math.max(map.getZoom()||0,15),{duration:0.7});
+  // Move the page focus to the map first. This is separate from Leaflet's
+  // flyTo: on mobile the page itself may still be scrolled over Saved Places.
+  const mapEl=document.getElementById('map');
+  if(mapEl){
+    mapEl.scrollIntoView({
+      behavior:'smooth',
+      block:'center'
+    });
+  }
+
+  // Let the page settle before animating the Leaflet map.
+  setTimeout(()=>{
+    if(!map)return;
+    map.invalidateSize(true);
+    map.flyTo(
+      [Number(p.lat),Number(p.lng)],
+      Math.max(map.getZoom()||0,15),
+      {duration:0.7}
+    );
+  },300);
 
   travelRadarFocusHighlight=L.circle([Number(p.lat),Number(p.lng)],{
     radius:140,
@@ -1325,7 +1364,7 @@ function showPlaceOnMap(id){
 
   setTimeout(()=>{
     try{marker.openPopup();}catch(e){}
-  },450);
+  },850);
 }
 
 
@@ -2573,7 +2612,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// v2.5.49 — iPhone-friendly explicit clipboard paste.
+// v2.5.50 — iPhone-friendly explicit clipboard paste.
 async function pasteReelLink(){
   const input=document.getElementById('url');
   const btn=document.getElementById('pasteReelBtn');
@@ -2821,7 +2860,7 @@ button.secondary,
 </style>
 
 <style id="travelradar-v2549-layout">
-/* v2.5.49 — URL input uses the full card width; actions sit below it. */
+/* v2.5.50 — URL input uses the full card width; actions sit below it. */
 .reel-url-card{
   padding:18px;
 }
@@ -2855,6 +2894,16 @@ button.secondary,
     padding:0 5px;
     font-size:12px;
   }
+}
+</style>
+
+<style id="travelradar-v2550-focus">
+/* Keep the manual location row visually clear after Add. */
+#locationInput{
+  scroll-margin-top:20px;
+}
+#map{
+  scroll-margin-top:18px;
 }
 </style>
 </body>
