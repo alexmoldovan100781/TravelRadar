@@ -1022,17 +1022,97 @@ function matchesSavedSearch(pin,query){
     .every(keyword=>description.includes(keyword));
 }
 
+function sleep(ms){
+  return new Promise(resolve=>setTimeout(resolve,ms));
+}
+
+/*
+ * v5.0: /metadata and /thumbnail no longer block on Apify. A first-time
+ * Reel returns HTTP 202 {status:"processing", jobId} immediately, and the
+ * Worker finishes the job in the background via an Apify webhook. This
+ * polls /status?jobId=... until the job resolves (or fails, or times out)
+ * and hands back the same shape of metadata object the old synchronous
+ * /metadata call used to return directly.
+ */
+async function pollTravelRadarJob(jobId,onTick){
+  const POLL_INTERVAL_MS=2500;
+  const MAX_WAIT_MS=90000;
+  const startedAt=Date.now();
+
+  while(Date.now()-startedAt<MAX_WAIT_MS){
+    await sleep(POLL_INTERVAL_MS);
+
+    let response;
+    try{
+      response=await fetch(
+        window.TRAVELRADAR_AI_PROXY+
+        '/status?jobId='+encodeURIComponent(jobId),
+        {cache:'no-store'}
+      );
+    }catch(_){
+      // Transient network hiccup — keep polling until MAX_WAIT_MS.
+      continue;
+    }
+
+    let data=null;
+    try{data=await response.json();}catch(_){data=null;}
+
+    if(!data){
+      throw new Error('Worker returned an invalid status response.');
+    }
+
+    if(data.status==='processing'){
+      if(onTick)onTick(Math.round((Date.now()-startedAt)/1000));
+      continue;
+    }
+
+    if(!response.ok || data.ok===false){
+      throw new Error(data.error || 'The Reel could not be processed.');
+    }
+
+    return data;
+  }
+
+  throw new Error('This is taking longer than expected. Please try again in a moment.');
+}
+
+/*
+ * Fetches /metadata for a Reel URL. If the Worker already has it cached,
+ * this resolves immediately, same as before. If not, the Worker kicks off
+ * an async Apify job and this transparently waits on /status until it's
+ * done, so every existing caller keeps working without changes.
+ */
+async function fetchTravelRadarMetadata(url,onTick){
+  const response=await fetch(
+    window.TRAVELRADAR_AI_PROXY+
+    '/metadata?url='+encodeURIComponent(url),
+    {cache:'no-store'}
+  );
+
+  let data=null;
+  try{data=await response.json();}catch(_){data=null;}
+
+  if(!data){
+    throw new Error('Worker request failed (HTTP '+response.status+')');
+  }
+
+  if(data.status==='processing' && data.jobId){
+    return await pollTravelRadarJob(data.jobId,onTick);
+  }
+
+  if(!response.ok || data.error || data.ok===false){
+    throw new Error(
+      data.error || ('Worker request failed (HTTP '+response.status+')')
+    );
+  }
+
+  return data;
+}
+
 async function fetchReelCaption(url){
   if(!url || !window.TRAVELRADAR_AI_PROXY)return '';
   try{
-    const response=await fetch(
-      window.TRAVELRADAR_AI_PROXY+
-      '/metadata?url='+encodeURIComponent(url),
-      {cache:'no-store'}
-    );
-    if(!response.ok)return '';
-    const data=await response.json();
-    if(data?.error)return '';
+    const data=await fetchTravelRadarMetadata(url);
     return String(data?.caption||data?.og_description||'').trim();
   }catch(_){
     return '';
@@ -1982,33 +2062,15 @@ async function analyzeReelWithAI(){
   );
 
   try{
-    const response=await fetch(
-      window.TRAVELRADAR_AI_PROXY+
-      '/metadata?url='+
-      encodeURIComponent(url),
-      {cache:'no-store'}
-    );
-
-    let data=null;
-
-    try{
-      data=await response.json();
-    }catch(_){
-      data=null;
-    }
-
-    if(
-      !response.ok ||
-      !data ||
-      data.error
-    ){
-      throw new Error(
-        data?.error ||
-        ('Worker request failed (HTTP '+
-          response.status+
-          ')')
+    const data=await fetchTravelRadarMetadata(url,(elapsedSeconds)=>{
+      setReelStatus(
+        'Still processing the Reel… ('+elapsedSeconds+'s)',
+        ''
       );
-    }
+      document.getElementById('aiResult').innerHTML=
+        '<div class="status">⏳ Still processing the Reel… this can take up to a minute the first time. ('+
+        elapsedSeconds+'s)</div>';
+    });
 
     workerMetadata=data;
 
