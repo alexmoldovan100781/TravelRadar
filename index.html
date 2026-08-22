@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.38</title>
+  <title>TravelRadar v2.5.54</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
@@ -58,7 +58,7 @@
     @keyframes travelRadarFocusPulse{0%{opacity:.85}100%{opacity:0}}
 
     /* =====================================================
-       MAP PIN VISUAL SYSTEM — v2.5.38
+       MAP PIN VISUAL SYSTEM — v2.5.54
        1–2★  = discreet gray
        3★    = standard blue
        4★    = accent green + subtle halo
@@ -226,7 +226,7 @@ button{
   white-space:nowrap;
 }
 
-/* v2.5.38 — Saved places mobile sizing */
+/* v2.5.54 — Saved places mobile sizing */
 .place{
   min-width:0;
 }
@@ -287,7 +287,7 @@ button{
 
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.53</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.54</span></header>
 <main>
   <section class="card reel-url-card">
     <input id="url" class="input" placeholder="Paste Instagram or Facebook Reel URL…">
@@ -431,7 +431,7 @@ button{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.53';
+const VERSION='v2.5.54';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -458,7 +458,7 @@ function travelRadarRatingPinIcon(stars){
 
 // =====================================================
 // STORAGE RECOVERY / MIGRATION
-// v2.5.38 scans the current origin's localStorage for
+// v2.5.54 scans the current origin's localStorage for
 // older TravelRadar pin arrays before using the active key.
 // Nothing is deleted from localStorage during recovery.
 // =====================================================
@@ -591,7 +591,7 @@ function save(){localStorage.setItem(KEY,JSON.stringify(places));render()}
 
 // =====================================================
 // LOCAL JSON BACKUP / RESTORE
-// v2.5.38 keeps normal operation in localStorage, but
+// v2.5.54 keeps normal operation in localStorage, but
 // provides an explicit portable text backup containing
 // ALL saved pins. Import merges pins instead of deleting
 // the current collection.
@@ -1000,7 +1000,7 @@ function buildThumbnailUrl(reelUrl){
     '/thumbnail?url='+encodeURIComponent(reelUrl);
 }
 
-// v2.5.38: saved-place descriptions are collapsed and expandable in the list.
+// v2.5.54: saved-place descriptions are collapsed and expandable in the list.
 function normalizeSearchText(value){
   return String(value||'')
     .toLowerCase()
@@ -1224,7 +1224,7 @@ function safeUrl(url){
   }
 }
 
-// v2.5.53: resolve Reel links from both current and legacy pin schemas.
+// v2.5.54: resolve Reel links from both current and legacy pin schemas.
 // This prevents UI changes from hiding a valid Reel link stored under
 // reelUrl/sourceUrl/originalUrl instead of url.
 function normalizeReelUrl(value){
@@ -1977,7 +1977,7 @@ function toggleExactLocation(enabled){
   if(map)render();
 }
 
-// v2.5.38: notifications are controlled only by the global app switch.
+// v2.5.54: notifications are controlled only by the global app switch.
 // Every saved pin uses its configured alert radius when global notifications are ON.
 notificationsEnabled = localStorage.getItem('travelRadarNotificationsEnabled') !== '0';
 notificationPermission = ('Notification' in window && Notification.permission === 'granted');
@@ -2753,7 +2753,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// v2.5.53 — iPhone-friendly explicit clipboard paste.
+// v2.5.54 — iPhone-friendly explicit clipboard paste.
 async function pasteReelLink(){
   const input=document.getElementById('url');
   const btn=document.getElementById('pasteReelBtn');
@@ -3001,7 +3001,7 @@ button.secondary,
 </style>
 
 <style id="travelradar-v2549-layout">
-/* v2.5.53 — URL input uses the full card width; actions sit below it. */
+/* v2.5.54 — URL input uses the full card width; actions sit below it. */
 .reel-url-card{
   padding:18px;
 }
