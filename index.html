@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.55</title>
+  <title>TravelRadar v2.5.56</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script>
-    // v2.5.55 diagnostic: the browser's default "Script error." message
+    // v2.5.56 diagnostic: the browser's default "Script error." message
     // hides real details for errors in cross-origin scripts (or inside
     // some sandboxed previews). This listener logs whatever it CAN see
     // — message/file/line when available — so we're not stuck guessing.
@@ -30,7 +30,7 @@
   </script>
   <style>
     /* ===================================================
-       v2.5.55 — UNIFIED DESIGN TOKENS
+       v2.5.56 — UNIFIED DESIGN TOKENS
        Consolidates what used to be 3 separate, drifting
        :root blocks (this one, "travellradar-v2525-design-
        system", and "travelradar-v2547-button-system") into
@@ -142,7 +142,7 @@
     @keyframes travelRadarFocusPulse{0%{opacity:.85}100%{opacity:0}}
 
     /* =====================================================
-       MAP PIN VISUAL SYSTEM — v2.5.55
+       MAP PIN VISUAL SYSTEM — v2.5.56
        1–2★  = discreet gray
        3★    = standard blue
        4★    = accent green + subtle halo
@@ -232,7 +232,7 @@
 
 
 <style id="travellradar-v2525-design-system">
-/* v2.5.55: local :root removed — these all point at the unified
+/* v2.5.56: local :root removed — these all point at the unified
    tokens defined at the top of the file now. body{color} used to
    be set here AND at line 12 with a different navy shade; that
    silent second override is gone, --text wins once, consistently. */
@@ -304,7 +304,7 @@ button{
   white-space:nowrap;
 }
 
-/* v2.5.55 — Saved places mobile sizing */
+/* v2.5.56 — Saved places mobile sizing */
 .place{
   min-width:0;
 }
@@ -365,7 +365,7 @@ button{
 
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.55</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.56</span></header>
 <main>
   <section class="card reel-url-card">
     <input id="url" class="input" placeholder="Paste Instagram or Facebook Reel URL…">
@@ -508,7 +508,7 @@ button{
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.55';
+const VERSION='v2.5.56';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -535,7 +535,7 @@ function travelRadarRatingPinIcon(stars){
 
 // =====================================================
 // STORAGE RECOVERY / MIGRATION
-// v2.5.55 scans the current origin's localStorage for
+// v2.5.56 scans the current origin's localStorage for
 // older TravelRadar pin arrays before using the active key.
 // Nothing is deleted from localStorage during recovery.
 // =====================================================
@@ -668,7 +668,7 @@ function save(){localStorage.setItem(KEY,JSON.stringify(places));render()}
 
 // =====================================================
 // LOCAL JSON BACKUP / RESTORE
-// v2.5.55 keeps normal operation in localStorage, but
+// v2.5.56 keeps normal operation in localStorage, but
 // provides an explicit portable text backup containing
 // ALL saved pins. Import merges pins instead of deleting
 // the current collection.
@@ -1077,7 +1077,7 @@ function buildThumbnailUrl(reelUrl){
     '/thumbnail?url='+encodeURIComponent(reelUrl);
 }
 
-// v2.5.55: saved-place descriptions are collapsed and expandable in the list.
+// v2.5.56: saved-place descriptions are collapsed and expandable in the list.
 function normalizeSearchText(value){
   return String(value||'')
     .toLowerCase()
@@ -1301,7 +1301,7 @@ function safeUrl(url){
   }
 }
 
-// v2.5.55: resolve Reel links from both current and legacy pin schemas.
+// v2.5.56: resolve Reel links from both current and legacy pin schemas.
 // This prevents UI changes from hiding a valid Reel link stored under
 // reelUrl/sourceUrl/originalUrl instead of url.
 function normalizeReelUrl(value){
@@ -2054,7 +2054,7 @@ function toggleExactLocation(enabled){
   if(map)render();
 }
 
-// v2.5.55: notifications are controlled only by the global app switch.
+// v2.5.56: notifications are controlled only by the global app switch.
 // Every saved pin uses its configured alert radius when global notifications are ON.
 notificationsEnabled = localStorage.getItem('travelRadarNotificationsEnabled') !== '0';
 notificationPermission = ('Notification' in window && Notification.permission === 'granted');
@@ -2830,7 +2830,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// v2.5.55 — iPhone-friendly explicit clipboard paste.
+// v2.5.56 — iPhone-friendly explicit clipboard paste.
 // Returns the pasted text on success, or null (empty clipboard / no
 // permission / read failed) — the caller decides what to do next.
 async function pasteReelLink(){
@@ -2872,7 +2872,7 @@ async function pasteReelLink(){
   }
 }
 
-// v2.5.55 — single contextual button replacing the old separate
+// v2.5.56 — single contextual button replacing the old separate
 // "Paste link" + "+ Add" pair:
 //  - if the field already has text (typed/pasted manually), skip the
 //    clipboard entirely and just proceed — this avoids triggering iOS's
@@ -2906,7 +2906,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 
 <style id="travelradar-v2547-button-system">
-/* v2.5.55: --tr-btn-h/--tr-btn-radius/--tr-blue-* now come from the
+/* v2.5.56: --tr-btn-h/--tr-btn-radius/--tr-blue-* now come from the
    unified :root at the top (--tr-btn-h raised 42px -> var(--tap-min),
    44px, to clear Apple's minimum comfortable tap-target size). The
    category badge colors below (purple/cyan/green/gray/red) are kept
@@ -3080,11 +3080,10 @@ button.secondary,
   min-width:128px;
 }
 
-/* Top Reel URL controls — v2.5.55: Paste link + Add merged into
+/* Top Reel URL controls — v2.5.56: Paste link + Add merged into
    one contextual Paste & Go button, so this row is now 2 buttons
-   (Paste & Go, Clear) instead of 3. */
-#url + #pasteAndGoBtn{min-width:140px}
-#url + #pasteAndGoBtn + .tr-btn{min-width:92px}
+   (Paste & Go, Clear) instead of 3. Column widths are set on
+   .reel-url-actions (2fr/1fr grid) above, not per-button min-width. */
 
 /* Mobile: preserve compact pills without forcing horizontal overflow. */
 @media(max-width:520px){
@@ -3099,10 +3098,6 @@ button.secondary,
     min-width:0;
     flex:1 1 calc(50% - 4px);
   }
-  #url + #pasteAndGoBtn,
-  #url + #pasteAndGoBtn + .tr-btn{
-    min-width:0;
-  }
   .pinAction{
     height:40px;
     min-height:40px;
@@ -3112,7 +3107,7 @@ button.secondary,
 </style>
 
 <style id="travelradar-v2549-layout">
-/* v2.5.55 — URL input uses the full card width; actions sit below it. */
+/* v2.5.56 — URL input uses the full card width; actions sit below it. */
 .reel-url-card{
   padding:18px;
 }
@@ -3125,7 +3120,7 @@ button.secondary,
 }
 .reel-url-actions{
   display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
+  grid-template-columns:2fr 1fr;
   gap:9px;
   margin-top:10px;
 }
@@ -3134,10 +3129,12 @@ button.secondary,
   min-width:0 !important;
 }
 
-/* On small iPhones keep all three actions on one compact row. */
+/* v2.5.56: Paste link + Add merged into Paste & Go, so this row now
+   holds 2 actions, not 3 — Paste & Go gets more width as the primary
+   action, Clear stays narrow since it's used far less often. */
 @media(max-width:520px){
   .reel-url-actions{
-    grid-template-columns:repeat(3,minmax(0,1fr));
+    grid-template-columns:2fr 1fr;
     gap:7px;
   }
   .reel-url-actions .tr-btn{
