@@ -370,8 +370,7 @@ button{
   <section class="card reel-url-card">
     <input id="url" class="input" placeholder="Paste Instagram or Facebook Reel URL…">
     <div class="reel-url-actions">
-      <button id="pasteReelBtn" type="button" class="tr-btn tr-btn-secondary">🔗 Paste link</button>
-      <button class="tr-btn tr-btn-primary" onclick="prepareReel()">＋ Add</button>
+      <button id="pasteAndGoBtn" type="button" class="tr-btn tr-btn-primary">🔗 Paste &amp; Go</button>
       <button class="tr-btn tr-btn-neutral" onclick="clearUrl()">× Clear</button>
     </div>
     
@@ -2832,12 +2831,14 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // v2.5.55 — iPhone-friendly explicit clipboard paste.
+// Returns the pasted text on success, or null (empty clipboard / no
+// permission / read failed) — the caller decides what to do next.
 async function pasteReelLink(){
   const input=document.getElementById('url');
-  const btn=document.getElementById('pasteReelBtn');
-  if(!input) return;
+  const btn=document.getElementById('pasteAndGoBtn');
+  if(!input) return null;
 
-  const original=btn ? btn.textContent : 'Paste link';
+  const original=btn ? btn.textContent : '🔗 Paste & Go';
   const feedback=(text)=>{
     if(!btn) return;
     btn.textContent=text;
@@ -2855,22 +2856,51 @@ async function pasteReelLink(){
         input.dispatchEvent(new Event('change',{bubbles:true}));
         input.focus();
         feedback('Pasted ✓');
-        return;
+        return text;
       }
       feedback('Clipboard empty');
-      return;
+      return null;
     }
 
     feedback('Paste unavailable');
+    return null;
   }catch(e){
     // Clipboard permission may be unavailable for local HTML files/WebViews.
     // Keep the interaction silent instead of triggering iOS's native Paste UI.
     feedback('Paste unavailable');
+    return null;
+  }
+}
+
+// v2.5.55 — single contextual button replacing the old separate
+// "Paste link" + "+ Add" pair:
+//  - if the field already has text (typed/pasted manually), skip the
+//    clipboard entirely and just proceed — this avoids triggering iOS's
+//    clipboard permission prompt when it isn't needed
+//  - if the field is empty, read the clipboard (same iOS-safe path as
+//    before); if what came back looks like a supported Reel URL, advance
+//    automatically; if not, leave it in the field for the user to check
+//    instead of guessing
+async function pasteAndGo(){
+  const input=document.getElementById('url');
+  if(!input) return;
+
+  if(input.value.trim()){
+    prepareReel();
+    return;
+  }
+
+  const pastedText=await pasteReelLink();
+  if(!pastedText) return;
+
+  const normalized=normalizeSocialUrl(pastedText);
+  if(normalized && isSupportedReelUrl(normalized)){
+    prepareReel();
   }
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
-  document.getElementById('pasteReelBtn')?.addEventListener('click',pasteReelLink);
+  document.getElementById('pasteAndGoBtn')?.addEventListener('click',pasteAndGo);
 });
 </script>
 
@@ -3050,10 +3080,11 @@ button.secondary,
   min-width:128px;
 }
 
-/* Top Reel URL controls */
-#url + #pasteReelBtn{min-width:112px}
-#url + #pasteReelBtn + .tr-btn{min-width:92px}
-#url + #pasteReelBtn + .tr-btn + .tr-btn{min-width:92px}
+/* Top Reel URL controls — v2.5.55: Paste link + Add merged into
+   one contextual Paste & Go button, so this row is now 2 buttons
+   (Paste & Go, Clear) instead of 3. */
+#url + #pasteAndGoBtn{min-width:140px}
+#url + #pasteAndGoBtn + .tr-btn{min-width:92px}
 
 /* Mobile: preserve compact pills without forcing horizontal overflow. */
 @media(max-width:520px){
@@ -3068,9 +3099,8 @@ button.secondary,
     min-width:0;
     flex:1 1 calc(50% - 4px);
   }
-  #url + #pasteReelBtn,
-  #url + #pasteReelBtn + .tr-btn,
-  #url + #pasteReelBtn + .tr-btn + .tr-btn{
+  #url + #pasteAndGoBtn,
+  #url + #pasteAndGoBtn + .tr-btn{
     min-width:0;
   }
   .pinAction{
