@@ -5,60 +5,144 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0b1220">
   <link rel="manifest" href="manifest.json">
-  <title>TravelRadar v2.5.54</title>
+  <title>TravelRadar v2.5.55</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script>
+    // v2.5.55 diagnostic: the browser's default "Script error." message
+    // hides real details for errors in cross-origin scripts (or inside
+    // some sandboxed previews). This listener logs whatever it CAN see
+    // — message/file/line when available — so we're not stuck guessing.
+    window.addEventListener('error', function(e){
+      try{
+        console.error(
+          '[TravelRadar diagnostic] message=', e.message,
+          'file=', e.filename,
+          'line=', e.lineno, 'col=', e.colno,
+          'stack=', e.error && e.error.stack
+        );
+      }catch(_){}
+    });
+    window.addEventListener('unhandledrejection', function(e){
+      try{
+        console.error('[TravelRadar diagnostic] unhandled promise rejection:', e.reason);
+      }catch(_){}
+    });
+  </script>
   <style>
-    :root{--bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;--navy:#071426;--glow:#38bdf8}
+    /* ===================================================
+       v2.5.55 — UNIFIED DESIGN TOKENS
+       Consolidates what used to be 3 separate, drifting
+       :root blocks (this one, "travellradar-v2525-design-
+       system", and "travelradar-v2547-button-system") into
+       one source of truth. Old variable names are kept as
+       aliases so nothing else in the file needs to change —
+       they now just point at the same canonical values
+       instead of near-duplicate ones.
+       =================================================== */
+    :root{
+      /* --- Canonical colors --- */
+      --bg:#f3f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;
+      --accent:#0ea5e9;--accent2:#2563eb;--border:#dbe4f0;
+      --navy:#071426;--glow:#38bdf8;
+      --success:#166534;--success-bg:#ecfdf5;
+      --danger:#dc2626;--danger-bg:#fef2f2;
+      --subtle:#94a3b8;
+
+      /* --- Aliases (old names, same values now) ---
+         --tr-primary and --tr-blue-strong used to be
+         #1473e6/var(--tr-blue-strong), two different blues from --accent2's
+         var(--accent2); --tr-text was #152033 vs --text's #0f172a;
+         --tr-muted was #667085 vs --muted's var(--muted).
+         All now point at one canonical value each. */
+      --tr-primary:var(--accent2);
+      --tr-text:var(--text);
+      --tr-muted:var(--muted);
+      --tr-border:var(--border);
+      --tr-blue-bg:#eaf3ff;
+      --tr-blue-text:var(--accent2);
+      --tr-blue-strong:#1d4ed8;
+
+      /* --- Radius scale ---
+         Was 9 different values (6/10/11/12/14/15/16/18/999px)
+         with no clear rule. --tr-radius used to be 16px while
+         .card (the same visual concept) hardcoded 18px right
+         next to it — now both point at --radius-lg. */
+      --radius-sm:8px;
+      --radius-md:12px;
+      --radius-lg:18px;
+      --radius-pill:999px;
+      --tr-radius:var(--radius-lg);
+
+      /* --- Type scale ---
+         For reused UI text (labels, meta, buttons, body).
+         Decorative/icon glyph sizes (emoji badges, big step
+         numbers) are intentionally separate — they're one-off
+         display sizes, not inconsistency. */
+      --font-xs:11px;
+      --font-sm:12px;
+      --font-md:13px;
+      --font-base:14px;
+      --font-lg:16px;
+      --font-xl:20px;
+
+      /* --- Shadow scale --- */
+      --shadow-sm:0 1px 3px rgba(15,23,42,.10);
+      --shadow-md:0 4px 14px rgba(15,23,42,.12);
+      --shadow-lg:0 8px 24px rgba(15,23,42,.16);
+
+      /* --- Minimum comfortable tap target (Apple HIG / Material) --- */
+      --tap-min:44px;
+    }
     *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif}
     header{padding:calc(env(safe-area-inset-top) + 14px) 18px 14px;background:linear-gradient(135deg,#071426,#0b2a4a 65%,#0ea5e9);color:white;display:flex;justify-content:space-between;align-items:center;box-shadow:0 6px 24px #07142630}
-    h1{font-size:23px;margin:0;letter-spacing:-.3px}.brandMark{display:inline-grid;place-items:center;width:34px;height:34px;margin-right:9px;border-radius:11px;background:linear-gradient(145deg,#38bdf8,#2563eb);box-shadow:0 4px 14px #0004;vertical-align:-8px;font-size:20px}.badge{font-size:12px;background:#ffffff20;border:1px solid #ffffff35;padding:6px 9px;border-radius:999px}
-    main{padding:14px;max-width:760px;margin:auto}.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:15px;margin-bottom:12px;box-shadow:0 4px 18px #00000008}
+    h1{font-size:23px;margin:0;letter-spacing:-.3px}.brandMark{display:inline-grid;place-items:center;width:34px;height:34px;margin-right:9px;border-radius:11px;background:linear-gradient(145deg,#38bdf8,var(--accent2));box-shadow:0 4px 14px #0004;vertical-align:-8px;font-size:20px}.badge{font-size:12px;background:#ffffff20;border:1px solid #ffffff35;padding:6px 9px;border-radius:999px}
+    main{padding:14px;max-width:760px;margin:auto}.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:15px;margin-bottom:12px;box-shadow:var(--shadow-md)}
     .row{display:flex;gap:10px;align-items:center}.grow{flex:1}.muted{color:var(--muted);font-size:13px}
     input,select,button{font:inherit}.input{width:100%;padding:12px;border:1px solid var(--border);border-radius:12px;background:white}
     button{border:0;border-radius:12px;padding:11px 14px;background:linear-gradient(135deg,var(--accent2),var(--accent));color:white;font-weight:700;box-shadow:0 4px 12px #0ea5e925}
     button:disabled{opacity:.45;cursor:not-allowed}.secondary{background:#eaf4ff;color:#075985;box-shadow:none}
     #map{height:360px;border-radius:15px;overflow:hidden;margin-top:10px}
-    .place{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}.place:last-child{border-bottom:0}.dot{width:42px;height:42px;border-radius:12px;background:#dbeafe;display:grid;place-items:center;font-size:20px}
+    .place{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}.place:last-child{border-bottom:0}.dot{width:42px;height:42px;border-radius:12px;background:var(--tr-blue-bg);display:grid;place-items:center;font-size:20px}
     nav{position:sticky;bottom:0;background:#ffffffed;backdrop-filter:blur(12px);padding:10px max(14px,env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom));display:flex;justify-content:space-around;border-top:1px solid var(--border)}
     nav button{background:transparent;color:var(--muted);padding:7px 12px}.primary{color:var(--accent)}
-    .hidden{display:none}.candidateList{display:flex;flex-direction:column;gap:8px;margin-top:10px;max-height:55vh;overflow-y:auto;padding-right:2px}.candidateBtn{width:100%;text-align:left;background:#fff;color:#111827;border:1px solid var(--border);padding:11px 12px;border-radius:12px;font-weight:500}.candidateBtn.selected{background:#dbeafe;border-color:#60a5fa;color:#1d4ed8}.candidateBtn small{display:block;color:var(--muted);font-weight:400;margin-top:3px}.notifyBtn{background:#eef2ff;color:#1d4ed8;padding:7px 10px;font-size:12px}.notifyBtn.on{background:#dcfce7;color:#166534}
+    .hidden{display:none}.candidateList{display:flex;flex-direction:column;gap:8px;margin-top:10px;max-height:55vh;overflow-y:auto;padding-right:2px}.candidateBtn{width:100%;text-align:left;background:#fff;color:#111827;border:1px solid var(--border);padding:11px 12px;border-radius:12px;font-weight:500}.candidateBtn.selected{background:var(--tr-blue-bg);border-color:#60a5fa;color:var(--tr-blue-strong)}.candidateBtn small{display:block;color:var(--muted);font-weight:400;margin-top:3px}.notifyBtn{background:#eef2ff;color:var(--tr-blue-strong);padding:7px 10px;font-size:12px}.notifyBtn.on{background:#dcfce7;color:var(--success)}
     .switch{position:relative;width:52px;height:30px;display:inline-block;flex:0 0 auto}
     .switch input{opacity:0;width:0;height:0}
-    .slider{position:absolute;inset:0;background:#cbd5e1;border-radius:999px;cursor:pointer;transition:.2s}
+    .slider{position:absolute;inset:0;background:var(--border);border-radius:999px;cursor:pointer;transition:.2s}
     .slider:before{content:"";position:absolute;width:24px;height:24px;left:3px;top:3px;background:white;border-radius:50%;transition:.2s;box-shadow:0 1px 3px #0003}
     .switch input:checked+.slider{background:#22c55e}
     .switch input:checked+.slider:before{transform:translateX(22px)}
-    .status{margin-top:8px;padding:10px;border-radius:10px;background:#f8fafc}.detected{background:#ecfdf5;color:#166534}.error{background:#fef2f2;color:#991b1b}
+    .status{margin-top:8px;padding:10px;border-radius:10px;background:var(--bg)}.detected{background:var(--success-bg);color:var(--success)}.error{background:var(--danger-bg);color:#991b1b}
     .starProgress{position:relative;display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-top:20px;padding:0 2px 14px}
     .starTrack{pointer-events:none;position:absolute;left:10%;right:10%;top:86px;height:5px;border-radius:999px;background:linear-gradient(90deg,#fbbf24 0%,#f59e0b 25%,#fb7185 55%,#d946ef 78%,#7c3aed 100%);z-index:0;box-shadow:0 1px 4px #f59e0b35}
     .starChoice{position:relative;z-index:1;background:transparent!important;box-shadow:none!important;color:var(--text);padding:0 2px 0;border:0;border-radius:14px;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:0;transition:transform .16s,filter .16s}
     .starChoice:hover{transform:translateY(-2px)}
     .moodEmoji{font-size:39px;line-height:1;display:grid;place-items:center;width:54px;height:54px;background:#fff;border:2px solid #fbbf24;border-radius:50%;box-shadow:0 3px 12px #f59e0b20}
     .moodDistance{font-size:13px;font-weight:800;color:var(--text);white-space:nowrap}
-    .starChoice.selected .moodEmoji{border-color:#2563eb;box-shadow:0 0 0 3px #2563eb18,0 5px 18px #2563eb25;transform:scale(1.08)}
-    .starChoice.selected .moodDistance{color:#2563eb}
+    .starChoice.selected .moodEmoji{border-color:var(--accent2);box-shadow:0 0 0 3px #2563eb18,0 5px 18px #2563eb25;transform:scale(1.08)}
+    .starChoice.selected .moodDistance{color:var(--accent2)}
     .savedStars{color:#f6b817;font-size:16px;letter-spacing:1px;white-space:nowrap;text-shadow:0 0 5px #f6b81780,0 0 9px #f6b81730}
     .savedPinThumb{width:74px;height:74px;border-radius:14px;object-fit:cover;flex:0 0 74px;background:#eaf4ff;border:1px solid #dbe4f0;box-shadow:0 4px 12px #07142612}
-    .savedPinThumbPlaceholder{width:74px;height:74px;border-radius:14px;display:grid;place-items:center;flex:0 0 74px;background:linear-gradient(145deg,#dbeafe,#eff6ff);font-size:30px}
+    .savedPinThumbPlaceholder{width:74px;height:74px;border-radius:14px;display:grid;place-items:center;flex:0 0 74px;background:linear-gradient(145deg,var(--tr-blue-bg),#eff6ff);font-size:30px}
     @media(max-width:520px){.moodEmoji{font-size:33px;width:48px;height:48px}.moodDistance{font-size:12px}.starTrack{top:82px;left:9%;right:9%}.savedPinThumb,.savedPinThumbPlaceholder{width:64px;height:64px;flex-basis:64px}}
 
     .pinActions{display:flex;flex-direction:column;gap:7px;margin-top:9px;width:100%}
-    .pinAction{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:40px;padding:9px 12px;border:1px solid var(--border);border-radius:12px;background:#f8fafc;color:var(--text);text-decoration:none;font-size:13px;font-weight:650;line-height:1.2;box-shadow:none;cursor:pointer}
+    .pinAction{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:40px;padding:9px 12px;border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text);text-decoration:none;font-size:13px;font-weight:650;line-height:1.2;box-shadow:none;cursor:pointer}
     .pinAction:hover{background:#f1f5f9}
     .pinAction .pinActionLeft{display:flex;align-items:center;gap:8px}
-    .pinAction .pinActionChevron{font-size:18px;color:#94a3b8;line-height:1}
-    .pinAction.map{background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8}
+    .pinAction .pinActionChevron{font-size:18px;color:var(--subtle);line-height:1}
+    .pinAction.map{background:#eff6ff;border-color:#bfdbfe;color:var(--tr-blue-strong)}
     .pinAction.show{background:#e0f2fe;border-color:#bae6fd;color:#0369a1}
     .pinAction.notify{background:#eef2ff;border-color:#c7d2fe;color:#3730a3}
-    .pinAction.notify.on{background:#ecfdf5;border-color:#bbf7d0;color:#166534}
-    .pinAction.delete{background:#fef2f2;border-color:#fecaca;color:#b91c1c}
+    .pinAction.notify.on{background:var(--success-bg);border-color:#bbf7d0;color:var(--success)}
+    .pinAction.delete{background:var(--danger-bg);border-color:#fecaca;color:#b91c1c}
     .pinAction.delete:hover{background:#fee2e2}
     .pinActionsPopup{display:flex;flex-direction:column;gap:7px;margin-top:10px}
     .travelRadarFocusPulse{animation:travelRadarFocusPulse 1s ease-out 2;transform-origin:center}
     @keyframes travelRadarFocusPulse{0%{opacity:.85}100%{opacity:0}}
 
     /* =====================================================
-       MAP PIN VISUAL SYSTEM — v2.5.54
+       MAP PIN VISUAL SYSTEM — v2.5.55
        1–2★  = discreet gray
        3★    = standard blue
        4★    = accent green + subtle halo
@@ -92,7 +176,7 @@
       background:linear-gradient(145deg,#9ca3af,#6b7280);
     }
     .travelRadarRatingPin.rating-standard{
-      background:linear-gradient(145deg,#38bdf8,#2563eb);
+      background:linear-gradient(145deg,#38bdf8,var(--accent2));
     }
     .travelRadarRatingPin.rating-accent{
       background:linear-gradient(145deg,#86efac,#16a34a);
@@ -148,18 +232,12 @@
 
 
 <style id="travellradar-v2525-design-system">
-:root{
-  --tr-primary:#1473e6;
-  --tr-border:#e3e8ef;
-  --tr-text:#152033;
-  --tr-muted:#667085;
-  --tr-radius:16px;
-}
-body{
-  color:var(--tr-text);
-}
+/* v2.5.55: local :root removed — these all point at the unified
+   tokens defined at the top of the file now. body{color} used to
+   be set here AND at line 12 with a different navy shade; that
+   silent second override is gone, --text wins once, consistently. */
 button{
-  border-radius:12px;
+  border-radius:var(--radius-md);
   font-weight:600;
 }
 .card,.panel,.section,.pin-card,.saved-place,.location-card{
@@ -209,7 +287,7 @@ button{
 }
 .platformLogoGeneric{
   background:#e8eef6;
-  color:#64748b;
+  color:var(--muted);
   font-size:10px;
   font-weight:800;
 }
@@ -226,7 +304,7 @@ button{
   white-space:nowrap;
 }
 
-/* v2.5.54 — Saved places mobile sizing */
+/* v2.5.55 — Saved places mobile sizing */
 .place{
   min-width:0;
 }
@@ -287,7 +365,7 @@ button{
 
 </head>
 <body>
-<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.54</span></header>
+<header><div><h1><span class="brandMark">✦</span>TravelRadar</h1><div class="muted" style="color:#cbd5e1">Discover places worth saving ✨</div></div><span class="badge">v2.5.55</span></header>
 <main>
   <section class="card reel-url-card">
     <input id="url" class="input" placeholder="Paste Instagram or Facebook Reel URL…">
@@ -428,10 +506,10 @@ button{
 </main>
 <nav><button class="primary" onclick="focusRadar()">⌖<br><small>Radar</small></button><button onclick="document.getElementById('url').focus()">＋<br><small>Add Reel</small></button></nav>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
 <script>
 const KEY='travelradar_v1_places';
-const VERSION='v2.5.54';
+const VERSION='v2.5.55';
 window.TRAVELRADAR_AI_PROXY='https://travelradar-ai.alexandru1-moldovan.workers.dev';
 let cat='All', user=null, map, markers=[];
 let lastRenderedShownIds='';
@@ -458,7 +536,7 @@ function travelRadarRatingPinIcon(stars){
 
 // =====================================================
 // STORAGE RECOVERY / MIGRATION
-// v2.5.54 scans the current origin's localStorage for
+// v2.5.55 scans the current origin's localStorage for
 // older TravelRadar pin arrays before using the active key.
 // Nothing is deleted from localStorage during recovery.
 // =====================================================
@@ -591,7 +669,7 @@ function save(){localStorage.setItem(KEY,JSON.stringify(places));render()}
 
 // =====================================================
 // LOCAL JSON BACKUP / RESTORE
-// v2.5.54 keeps normal operation in localStorage, but
+// v2.5.55 keeps normal operation in localStorage, but
 // provides an explicit portable text backup containing
 // ALL saved pins. Import merges pins instead of deleting
 // the current collection.
@@ -1000,7 +1078,7 @@ function buildThumbnailUrl(reelUrl){
     '/thumbnail?url='+encodeURIComponent(reelUrl);
 }
 
-// v2.5.54: saved-place descriptions are collapsed and expandable in the list.
+// v2.5.55: saved-place descriptions are collapsed and expandable in the list.
 function normalizeSearchText(value){
   return String(value||'')
     .toLowerCase()
@@ -1224,7 +1302,7 @@ function safeUrl(url){
   }
 }
 
-// v2.5.54: resolve Reel links from both current and legacy pin schemas.
+// v2.5.55: resolve Reel links from both current and legacy pin schemas.
 // This prevents UI changes from hiding a valid Reel link stored under
 // reelUrl/sourceUrl/originalUrl instead of url.
 function normalizeReelUrl(value){
@@ -1977,7 +2055,7 @@ function toggleExactLocation(enabled){
   if(map)render();
 }
 
-// v2.5.54: notifications are controlled only by the global app switch.
+// v2.5.55: notifications are controlled only by the global app switch.
 // Every saved pin uses its configured alert radius when global notifications are ON.
 notificationsEnabled = localStorage.getItem('travelRadarNotificationsEnabled') !== '0';
 notificationPermission = ('Notification' in window && Notification.permission === 'granted');
@@ -2753,7 +2831,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// v2.5.54 — iPhone-friendly explicit clipboard paste.
+// v2.5.55 — iPhone-friendly explicit clipboard paste.
 async function pasteReelLink(){
   const input=document.getElementById('url');
   const btn=document.getElementById('pasteReelBtn');
@@ -2798,12 +2876,15 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 
 <style id="travelradar-v2547-button-system">
+/* v2.5.55: --tr-btn-h/--tr-btn-radius/--tr-blue-* now come from the
+   unified :root at the top (--tr-btn-h raised 42px -> var(--tap-min),
+   44px, to clear Apple's minimum comfortable tap-target size). The
+   category badge colors below (purple/cyan/green/gray/red) are kept
+   local — they're intentionally distinct semantic colors for different
+   badge types, not accidental duplicates, so there's nothing to unify. */
 :root{
-  --tr-btn-h:42px;
-  --tr-btn-radius:999px;
-  --tr-blue-bg:#eaf3ff;
-  --tr-blue-text:#2563eb;
-  --tr-blue-strong:#1d4ed8;
+  --tr-btn-h:var(--tap-min);
+  --tr-btn-radius:var(--radius-pill);
   --tr-purple-bg:#f3edff;
   --tr-purple-text:#7c3aed;
   --tr-cyan-bg:#e9f9fd;
@@ -3001,7 +3082,7 @@ button.secondary,
 </style>
 
 <style id="travelradar-v2549-layout">
-/* v2.5.54 — URL input uses the full card width; actions sit below it. */
+/* v2.5.55 — URL input uses the full card width; actions sit below it. */
 .reel-url-card{
   padding:18px;
 }
@@ -3092,7 +3173,7 @@ button.secondary,
   justify-content:center;
   min-height:24px;
   margin:2px 0 4px;
-  color:#2563eb;
+  color:var(--accent2);
   font-size:12px;
   font-weight:600;
 }
@@ -3120,7 +3201,7 @@ button.secondary,
   display:flex;
   align-items:center;
   gap:6px;
-  color:#94a3b8;
+  color:var(--subtle);
   font-size:11px;
   font-weight:600;
   white-space:nowrap;
@@ -3128,12 +3209,12 @@ button.secondary,
 .tr-step span{
   width:24px;height:24px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;
-  background:#f1f5f9;border:1px solid #dbe3ec;color:#64748b;
+  background:#f1f5f9;border:1px solid #dbe3ec;color:var(--muted);
   font-size:11px;
 }
-.tr-step.active{color:#2563eb}
+.tr-step.active{color:var(--accent2)}
 .tr-step.active span{
-  background:#eaf3ff;border-color:#9ec9ff;color:#2563eb;
+  background:#eaf3ff;border-color:#9ec9ff;color:var(--accent2);
 }
 .tr-step.complete{color:#059669}
 .tr-step.complete span{
